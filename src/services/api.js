@@ -29,7 +29,8 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
+    // Don't redirect if it's a login request
+    if (error.response?.status === 401 && !error.config.url.includes('/login')) {
       // Token expired or invalid
       localStorage.removeItem('token');
       localStorage.removeItem('auth');
@@ -46,13 +47,21 @@ export const authService = {
       if (response.data.token) {
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('auth', JSON.stringify({ email: response.data.email }));
+        return { 
+          success: true, 
+          data: response.data 
+        };
       }
-      return { success: true, data: response.data };
-    } catch (error) {
-      console.error('Login error:', error);
       return { 
         success: false, 
-        error: error.response?.data?.error || 'Login failed. Please try again.' 
+        error: 'Login failed. No token received.' 
+      };
+    } catch (error) {
+      console.error('Login error:', error);
+      const errorMessage = error.response?.data?.error || 'Login failed. Please check your credentials.';
+      return { 
+        success: false, 
+        error: errorMessage
       };
     }
   },

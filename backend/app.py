@@ -150,17 +150,14 @@ def init_user_table():
         password TEXT NOT NULL
     )''')
     
-    # Check if admin user exists
-    db_cursor.execute('SELECT * FROM users WHERE email = ?', ('admin@medlab.com',))
-    admin = db_cursor.fetchone()
+    # Remove any existing admin users
+    db_cursor.execute('DELETE FROM users')
     
-    if not admin:
-        # Create admin user if not exists
-        hashed_password = bcrypt.hashpw('admin123'.encode('utf-8'), bcrypt.gensalt())
-        db_cursor.execute('INSERT INTO users (email, password) VALUES (?, ?)', 
-                         ('admin@medlab.com', hashed_password))
-        conn.commit()
-    
+    # Create new admin user
+    hashed_password = bcrypt.hashpw('metacore@admin123'.encode('utf-8'), bcrypt.gensalt())
+    db_cursor.execute('INSERT INTO users (email, password) VALUES (?, ?)', 
+                     ('admin@metacore.com', hashed_password))
+    conn.commit()
     conn.close()
 
 # Initialize database when the app starts
@@ -612,26 +609,6 @@ def generate_report(patient_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/signup', methods=['POST'])
-def signup():
-    data = request.get_json()
-    email = data.get('email')
-    password = data.get('password')
-    if not email or not password or len(password) < 6:
-        return jsonify({'error': 'Invalid email or password'}), 400
-    hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-    try:
-        conn = sqlite3.connect('patients.db')
-        db_cursor = conn.cursor()
-        db_cursor.execute('INSERT INTO users (email, password) VALUES (?, ?)', (email, hashed))
-        conn.commit()
-        conn.close()
-        return jsonify({'message': 'User registered successfully'})
-    except sqlite3.IntegrityError:
-        return jsonify({'error': 'Email already exists'}), 409
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 @app.route('/api/login', methods=['POST', 'OPTIONS'])
 def login():
     if request.method == 'OPTIONS':
@@ -648,29 +625,67 @@ def login():
         if not email or not password:
             return jsonify({'error': 'Missing email or password'}), 400
         
-        # Only allow admin login
-        if email != 'admin@medlab.com':
-            return jsonify({'error': 'Invalid credentials'}), 401
-        
         conn = get_db_connection()
         db_cursor = conn.cursor()
         db_cursor.execute('SELECT id, password FROM users WHERE email = ?', (email,))
         user = db_cursor.fetchone()
         conn.close()
         
-        if user and bcrypt.checkpw(password.encode('utf-8'), user[1]):
-            payload = {
-                'user_id': user[0],
-                'email': email,
-                'exp': datetime.utcnow() + timedelta(days=1)
-            }
-            token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
-            return jsonify({'token': token, 'email': email})
-        else:
-            return jsonify({'error': 'Invalid credentials'}), 401
+        if not user:
+            return jsonify({'error': 'Invalid email address'}), 401
+            
+        if not bcrypt.checkpw(password.encode('utf-8'), user[1]):
+            return jsonify({'error': 'Invalid password'}), 401
+            
+        payload = {
+            'user_id': user[0],
+            'email': email,
+            'exp': datetime.utcnow() + timedelta(days=1)
+        }
+        token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
+        return jsonify({'token': token, 'email': email})
             
     except Exception as e:
         print(f"Login error: {str(e)}")  # Add logging
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/admin/update-credentials', methods=['POST'])
+@token_required
+def update_admin_credentials():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+            
+        new_email = data.get('email')
+        new_password = data.get('password')
+        current_password = data.get('currentPassword')
+        
+        if not new_email or not new_password or not current_password:
+            return jsonify({'error': 'Missing required fields'}), 400
+            
+        conn = get_db_connection()
+        db_cursor = conn.cursor()
+        
+        # Verify current password
+        db_cursor.execute('SELECT password FROM users WHERE email = ?', (g.user['email'],))
+        user = db_cursor.fetchone()
+        
+        if not user or not bcrypt.checkpw(current_password.encode('utf-8'), user[0]):
+            conn.close()
+            return jsonify({'error': 'Current password is incorrect'}), 401
+            
+        # Update credentials
+        hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+        db_cursor.execute('UPDATE users SET email = ?, password = ? WHERE email = ?',
+                         (new_email, hashed_password, g.user['email']))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'message': 'Credentials updated successfully'})
+        
+    except Exception as e:
+        print(f"Update credentials error: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/reports/track', methods=['POST'])
