@@ -8,6 +8,10 @@ import jwt
 import os
 import json
 from functools import wraps
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -22,7 +26,10 @@ CORS(app,
      }},
      supports_credentials=True)
 
-SECRET_KEY = 'your_secret_key_here'  # In production, use a secure secret key
+# Get secret key from environment variable
+SECRET_KEY = os.getenv('JWT_SECRET_KEY')
+if not SECRET_KEY:
+    raise ValueError("No JWT_SECRET_KEY set in environment variables")
 
 def token_required(f):
     @wraps(f)

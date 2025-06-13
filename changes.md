@@ -94,4 +94,16 @@ This document tracks all significant changes made to the MetaCore project.
   - Updated documentation to reflect new brand name
   - Improved user experience with consistent naming
 
+### [JWT Security Enhancement - Current Date]
+- Moved JWT secret key to environment variables
+- Added python-dotenv for secure environment variable management
+- Created .env file for configuration
+- Updated backend to use environment-based secret key
+- Benefits:
+  - Improved security by removing hardcoded secret key
+  - Better configuration management
+  - Easier deployment across different environments
+  - Ability to change secret key without code modification
+- Note: Changing the secret key invalidates all existing sessions
+
 --- 
