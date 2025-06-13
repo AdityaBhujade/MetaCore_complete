@@ -21,14 +21,14 @@ const AddEditPatient = ({ onPatientAdded, onCancel, editPatient }) => {
   useEffect(() => {
     if (editPatient) {
       setFormData({
-        fullName: editPatient.fullName,
-        age: editPatient.age,
-        gender: editPatient.gender,
-        contactNumber: editPatient.contactNumber,
-        email: editPatient.email,
-        address: editPatient.address,
+        fullName: editPatient.fullName || '',
+        age: editPatient.age || '',
+        gender: editPatient.gender || '',
+        contactNumber: editPatient.contactNumber || '',
+        email: editPatient.email || '',
+        address: editPatient.address || '',
         refBy: editPatient.refBy || '',
-        patientCode: editPatient.patientCode
+        patientCode: editPatient.patientCode || ''
       });
     } else {
       fetchLatestPatientCode();
@@ -40,13 +40,15 @@ const AddEditPatient = ({ onPatientAdded, onCancel, editPatient }) => {
     try {
       const response = await patientService.getLatestCode();
       if (response.success) {
-        setFormData(prev => ({ ...prev, patientCode: response.data.code }));
+        setFormData(prev => ({ ...prev, patientCode: response.data.code || '' }));
       } else {
         setError('Failed to fetch latest patient code');
+        setFormData(prev => ({ ...prev, patientCode: '' }));
       }
     } catch (e) {
       console.error('Failed to fetch latest patient code:', e);
       setError('Failed to fetch latest patient code');
+      setFormData(prev => ({ ...prev, patientCode: '' }));
     }
   };
 
@@ -122,9 +124,7 @@ const AddEditPatient = ({ onPatientAdded, onCancel, editPatient }) => {
   };
 
   const handleClearForm = () => {
-    // Only clear user-entered values, preserve pre-filled values
-    setFormData(prevData => ({
-      ...prevData,
+    setFormData({
       fullName: '',
       age: '',
       gender: '',
@@ -132,9 +132,8 @@ const AddEditPatient = ({ onPatientAdded, onCancel, editPatient }) => {
       email: '',
       address: '',
       refBy: '',
-      // Preserve patientCode if it was pre-filled
-      patientCode: prevData.patientCode
-    }));
+      patientCode: formData.patientCode || ''
+    });
   };
 
   return (

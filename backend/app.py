@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import sqlite3
+import mysql.connector
 from datetime import datetime, timedelta
 import re
 import bcrypt
@@ -56,29 +56,38 @@ def token_required(f):
     return decorated
 
 def get_db_connection():
-    conn = sqlite3.connect('patients.db')
-    conn.row_factory = sqlite3.Row  # This enables column access by name
+    # Use environment variables for MySQL credentials
+    DB_HOST = os.getenv('MYSQL_DB_HOST', 'localhost')
+    DB_USER = os.getenv('MYSQL_DB_USER', 'root')
+    DB_PASSWORD = os.getenv('MYSQL_DB_PASSWORD', '')
+    DB_NAME = os.getenv('MYSQL_DB_NAME', 'metacore_db') # Your new database name
+
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
+    )
     return conn
 
 def init_db():
-    # Check if database file exists
-    db_exists = os.path.exists('patients.db')
-    
+    # This function will now ensure tables exist with MySQL syntax, but won't recreate if they exist
+
     conn = get_db_connection()
     db_cursor = conn.cursor()
     
     # Create patients table if not exists
     db_cursor.execute('''
         CREATE TABLE IF NOT EXISTS patients (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            full_name TEXT NOT NULL,
-            age INTEGER NOT NULL,
-            gender TEXT NOT NULL,
-            contact_number TEXT NOT NULL,
-            email TEXT NOT NULL,
-            patient_code TEXT NOT NULL UNIQUE,
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            full_name VARCHAR(255) NOT NULL,
+            age INT NOT NULL,
+            gender VARCHAR(50) NOT NULL,
+            contact_number VARCHAR(50) NOT NULL,
+            email VARCHAR(255) NOT NULL,
+            patient_code VARCHAR(255) NOT NULL UNIQUE,
             address TEXT NOT NULL,
-            ref_by TEXT,
+            ref_by VARCHAR(255),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -86,15 +95,15 @@ def init_db():
     # Create tests table with updated schema
     db_cursor.execute('''
         CREATE TABLE IF NOT EXISTS tests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            patient_id INTEGER NOT NULL,
-            test_category TEXT NOT NULL,
-            test_subcategory TEXT NOT NULL,
-            test_name TEXT NOT NULL,
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            patient_id INT NOT NULL,
+            test_category VARCHAR(255) NOT NULL,
+            test_subcategory VARCHAR(255) NOT NULL,
+            test_name VARCHAR(255) NOT NULL,
             test_value TEXT NOT NULL,
             normal_range TEXT,
-            unit TEXT,
-            test_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            unit VARCHAR(50),
+            test_date DATETIME DEFAULT CURRENT_TIMESTAMP,
             additional_note TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (patient_id) REFERENCES patients (id)
@@ -104,11 +113,11 @@ def init_db():
     # Create lab_info table if not exists (single lab info)
     db_cursor.execute('''
         CREATE TABLE IF NOT EXISTS lab_info (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
             address TEXT NOT NULL,
-            phone TEXT NOT NULL,
-            email TEXT NOT NULL,
+            phone VARCHAR(50) NOT NULL,
+            email VARCHAR(255) NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -116,13 +125,13 @@ def init_db():
     # Create test_catalog table if not exists
     db_cursor.execute('''
         CREATE TABLE IF NOT EXISTS test_catalog (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            category TEXT NOT NULL,
-            subcategory TEXT NOT NULL,
-            price REAL,
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            category VARCHAR(255) NOT NULL,
+            subcategory VARCHAR(255) NOT NULL,
+            price FLOAT,
             reference_range TEXT,
-            unit TEXT,
+            unit VARCHAR(50),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -130,9 +139,9 @@ def init_db():
     # Create ref_doctors table if not exists
     db_cursor.execute('''
         CREATE TABLE IF NOT EXISTS ref_doctors (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            specialization TEXT,
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            specialization VARCHAR(255),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -140,8 +149,8 @@ def init_db():
     # Create reports table if not exists
     db_cursor.execute('''
         CREATE TABLE IF NOT EXISTS reports (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            patient_id INTEGER NOT NULL,
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            patient_id INT NOT NULL,
             generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (patient_id) REFERENCES patients (id)
         )
@@ -150,7 +159,7 @@ def init_db():
     conn.commit()
     conn.close()
     
-    return not db_exists  # Return True if this was a fresh initialization
+    return False # No longer based on db file existence
 
 def init_user_table():
     conn = get_db_connection()
@@ -158,18 +167,18 @@ def init_user_table():
     
     # Create users table if it doesn't exist
     db_cursor.execute('''CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        full_name TEXT,
-        phone TEXT,
-        role TEXT,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        full_name VARCHAR(255),
+        phone VARCHAR(50),
+        role VARCHAR(50),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
     
     # Check if any users exist
     db_cursor.execute('SELECT COUNT(*) as count FROM users')
-    user_count = db_cursor.fetchone()['count']
+    user_count = db_cursor.fetchone()[0] # Access by index for non-Row factory
     
     # Only create admin user if this is the first time (no users exist)
     if user_count == 0:
@@ -179,8 +188,9 @@ def init_user_table():
         
         # Create admin user
         hashed_password = bcrypt.hashpw(admin_password.encode('utf-8'), bcrypt.gensalt())
-        db_cursor.execute('INSERT INTO users (email, password, full_name, role) VALUES (?, ?, ?, ?)', 
-                         (admin_email, hashed_password, 'Admin User', 'admin'))
+        # Use %s placeholders for MySQL
+        db_cursor.execute('INSERT INTO users (email, password, full_name, role) VALUES (%s, %s, %s, %s)', 
+                         (admin_email, hashed_password.decode('utf-8'), 'Admin User', 'admin'))
         print(f"Created initial admin user with email: {admin_email}")
     
     conn.commit()
@@ -194,16 +204,14 @@ init_user_table()
 @app.route('/api/init-db', methods=['POST'])
 def initialize_database():
     try:
-        was_fresh = init_db()
+        init_db()
         init_user_table()
         return jsonify({
             'message': 'Database initialized successfully',
-            'was_fresh_init': was_fresh
+            'fresh_init': True # Always report as fresh init after manual trigger
         }), 200
     except Exception as e:
-        return jsonify({
-            'error': f'Failed to initialize database: {str(e)}'
-        }), 500
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/patients', methods=['GET'])
 @token_required
@@ -219,18 +227,21 @@ def get_patients():
         
         # Convert to list of dictionaries
         patient_list = []
-        for patient in patients:
+        # Using db_cursor.column_names to map tuples to dicts for consistency
+        columns = [desc[0] for desc in db_cursor.description]
+        for patient_row in patients:
+            patient_dict = dict(zip(columns, patient_row))
             patient_list.append({
-                'id': patient['id'],
-                'fullName': patient['full_name'],
-                'age': patient['age'],
-                'gender': patient['gender'],
-                'contactNumber': patient['contact_number'],
-                'email': patient['email'],
-                'patientCode': patient['patient_code'],
-                'address': patient['address'],
-                'refBy': patient['ref_by'] or '',
-                'createdAt': patient['created_at']
+                'id': patient_dict['id'],
+                'fullName': patient_dict['full_name'],
+                'age': patient_dict['age'],
+                'gender': patient_dict['gender'],
+                'contactNumber': patient_dict['contact_number'],
+                'email': patient_dict['email'],
+                'patientCode': patient_dict['patient_code'],
+                'address': patient_dict['address'],
+                'refBy': patient_dict['ref_by'] or '',
+                'createdAt': patient_dict['created_at']
             })
         
         return jsonify(patient_list)
@@ -249,13 +260,13 @@ def add_patient():
             return jsonify({'error': f'Missing required field: {field}'}), 400
     
     try:
-        conn = sqlite3.connect('patients.db')
+        conn = get_db_connection()
         db_cursor = conn.cursor()
         
         # Execute insert query
         db_cursor.execute('''
             INSERT INTO patients (full_name, age, gender, contact_number, email, patient_code, address, ref_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ''', (
             data['fullName'],
             data['age'],
@@ -269,28 +280,30 @@ def add_patient():
         conn.commit()
         conn.close()
         return jsonify({'message': 'Patient added successfully'}), 201
-    except sqlite3.IntegrityError:
-        return jsonify({'error': 'Patient code already exists'}), 400
+    except mysql.connector.IntegrityError as e:
+        if "Duplicate entry" in str(e) and "patient_code" in str(e):
+            return jsonify({'error': 'Patient code already exists'}), 400
+        return jsonify({'error': str(e)}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/patients/<int:patient_id>', methods=['PUT'])
 @token_required
 def update_patient(patient_id):
+    data = request.json
+    
+    # Validate required fields
+    required_fields = ['fullName', 'age', 'gender', 'contactNumber', 'email', 'patientCode', 'address']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({'error': f'Missing required field: {field}'}), 400
+    
     try:
-        data = request.json
-        
-        # Validate required fields
-        required_fields = ['fullName', 'age', 'gender', 'contactNumber', 'email', 'address']
-        for field in required_fields:
-            if field not in data:
-                return jsonify({'error': f'Missing required field: {field}'}), 400
-        
         conn = get_db_connection()
         db_cursor = conn.cursor()
         
         # Check if patient exists
-        db_cursor.execute('SELECT id FROM patients WHERE id = ?', (patient_id,))
+        db_cursor.execute('SELECT id FROM patients WHERE id = %s', (patient_id,))
         if not db_cursor.fetchone():
             conn.close()
             return jsonify({'error': 'Patient not found'}), 404
@@ -298,9 +311,9 @@ def update_patient(patient_id):
         # Update patient
         db_cursor.execute('''
             UPDATE patients 
-            SET full_name = ?, age = ?, gender = ?, contact_number = ?, 
-                email = ?, address = ?, ref_by = ?
-            WHERE id = ?
+            SET full_name = %s, age = %s, gender = %s, contact_number = %s, 
+                email = %s, address = %s, ref_by = %s
+            WHERE id = %s
         ''', (
             data['fullName'],
             data['age'],
@@ -311,10 +324,13 @@ def update_patient(patient_id):
             data.get('refBy', ''),
             patient_id
         ))
-        
         conn.commit()
         conn.close()
         return jsonify({'message': 'Patient updated successfully'}), 200
+    except mysql.connector.IntegrityError as e:
+        if "Duplicate entry" in str(e) and "patient_code" in str(e):
+            return jsonify({'error': 'Patient code already exists'}), 400
+        return jsonify({'error': str(e)}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -326,15 +342,16 @@ def delete_patient(patient_id):
         db_cursor = conn.cursor()
         
         # Check if patient exists
-        db_cursor.execute('SELECT id FROM patients WHERE id = ?', (patient_id,))
+        db_cursor.execute('SELECT id FROM patients WHERE id = %s', (patient_id,))
         if not db_cursor.fetchone():
             conn.close()
             return jsonify({'error': 'Patient not found'}), 404
         
         # Delete patient
-        db_cursor.execute('DELETE FROM patients WHERE id = ?', (patient_id,))
+        db_cursor.execute('DELETE FROM patients WHERE id = %s', (patient_id,))
         conn.commit()
         conn.close()
+        
         return jsonify({'message': 'Patient deleted successfully'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -344,36 +361,11 @@ def delete_patient(patient_id):
 def get_tests():
     try:
         conn = get_db_connection()
-        db_cursor = conn.cursor()
-        
-        # Get all tests with patient information
-        db_cursor.execute('''
-            SELECT t.*, p.full_name, p.patient_code 
-            FROM tests t 
-            JOIN patients p ON t.patient_id = p.id 
-            ORDER BY t.created_at DESC
-        ''')
+        db_cursor = conn.cursor(dictionary=True) # Fetch as dictionary
+        db_cursor.execute('SELECT * FROM tests ORDER BY created_at DESC')
         tests = db_cursor.fetchall()
         conn.close()
-        
-        # Convert to list of dictionaries
-        test_list = []
-        for test in tests:
-            test_list.append({
-                'id': test['id'],
-                'patientId': test['patient_id'],
-                'patientName': test['full_name'],
-                'patientCode': test['patient_code'],
-                'category': test['test_category'],
-                'testName': test['test_name'],
-                'value': test['test_value'],
-                'normalRange': test['normal_range'],
-                'unit': test['unit'],
-                'notes': test['additional_note'],
-                'createdAt': test['created_at']
-            })
-        
-        return jsonify(test_list)
+        return jsonify(tests)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -392,7 +384,7 @@ def add_test():
         
         db_cursor.execute('''
             INSERT INTO test_catalog (name, category, subcategory, reference_range, unit, price)
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s)
         ''', (
             data['name'],
             data['category'],
@@ -405,6 +397,10 @@ def add_test():
         conn.commit()
         conn.close()
         return jsonify({'message': 'Test added successfully'}), 201
+    except mysql.connector.IntegrityError as e:
+        if "Duplicate entry" in str(e) and "name" in str(e) and "category" in str(e) and "subcategory" in str(e):
+            return jsonify({'error': 'Test with this name, category, and subcategory already exists'}), 400
+        return jsonify({'error': str(e)}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -438,7 +434,7 @@ def add_test_results():
                     test_date,
                     additional_note
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             ''', (
                 data['patientId'],
                 data['category'],
@@ -474,7 +470,7 @@ def update_test(test_id):
         db_cursor = conn.cursor()
         
         # Check if test exists
-        db_cursor.execute('SELECT id FROM test_catalog WHERE id = ?', (test_id,))
+        db_cursor.execute('SELECT id FROM test_catalog WHERE id = %s', (test_id,))
         if not db_cursor.fetchone():
             conn.close()
             return jsonify({'error': 'Test not found'}), 404
@@ -482,8 +478,8 @@ def update_test(test_id):
         # Update test
         db_cursor.execute('''
             UPDATE test_catalog 
-            SET name = ?, category = ?, subcategory = ?, reference_range = ?, unit = ?, price = ?
-            WHERE id = ?
+            SET name = %s, category = %s, subcategory = %s, reference_range = %s, unit = %s, price = %s
+            WHERE id = %s
         ''', (
             data['name'],
             data['category'],
@@ -497,6 +493,10 @@ def update_test(test_id):
         conn.commit()
         conn.close()
         return jsonify({'message': 'Test updated successfully'}), 200
+    except mysql.connector.IntegrityError as e:
+        if "Duplicate entry" in str(e) and "name" in str(e) and "category" in str(e) and "subcategory" in str(e):
+            return jsonify({'error': 'Test with this name, category, and subcategory already exists'}), 400
+        return jsonify({'error': str(e)}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -508,39 +508,30 @@ def delete_test(test_id):
         db_cursor = conn.cursor()
         
         # Check if test exists
-        db_cursor.execute('SELECT id FROM test_catalog WHERE id = ?', (test_id,))
+        db_cursor.execute('SELECT id FROM test_catalog WHERE id = %s', (test_id,))
         if not db_cursor.fetchone():
             conn.close()
             return jsonify({'error': 'Test not found'}), 404
         
         # Delete test
-        db_cursor.execute('DELETE FROM test_catalog WHERE id = ?', (test_id,))
+        db_cursor.execute('DELETE FROM test_catalog WHERE id = %s', (test_id,))
         conn.commit()
         conn.close()
-        
         return jsonify({'message': 'Test deleted successfully'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/labs', methods=['GET'])
 def get_labs():
-    conn = sqlite3.connect('patients.db')
-    db_cursor = conn.cursor()
-    db_cursor.execute('SELECT * FROM labs ORDER BY created_at DESC')
-    labs = db_cursor.fetchall()
-    conn.close()
-    lab_list = []
-    for lab in labs:
-        lab_list.append({
-            'id': lab[0],
-            'name': lab[1],
-            'slogan': lab[2],
-            'address': lab[3],
-            'phone': lab[4],
-            'email': lab[5],
-            'createdAt': lab[6]
-        })
-    return jsonify(lab_list)
+    try:
+        conn = get_db_connection()
+        db_cursor = conn.cursor(dictionary=True) # Fetch as dictionary
+        db_cursor.execute('SELECT * FROM lab_info ORDER BY created_at DESC')
+        lab_info = db_cursor.fetchall()
+        conn.close()
+        return jsonify(lab_info)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/labs', methods=['POST'])
 def add_lab():
@@ -550,14 +541,13 @@ def add_lab():
         if field not in data:
             return jsonify({'error': f'Missing required field: {field}'}), 400
     try:
-        conn = sqlite3.connect('patients.db')
+        conn = get_db_connection()
         db_cursor = conn.cursor()
         db_cursor.execute('''
-            INSERT INTO labs (name, slogan, address, phone, email)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO lab_info (name, address, phone, email)
+            VALUES (%s, %s, %s, %s)
         ''', (
             data['name'],
-            data.get('slogan', ''),
             data['address'],
             data['phone'],
             data['email']
@@ -572,83 +562,99 @@ def add_lab():
 @token_required
 def generate_report(patient_id):
     try:
-        conn = sqlite3.connect('patients.db')
-        db_cursor = conn.cursor()
+        conn = get_db_connection()
+        db_cursor = conn.cursor() # Fetch as tuples by default
         
         # Get patient information
-        db_cursor.execute('SELECT * FROM patients WHERE id = ?', (patient_id,))
-        patient = db_cursor.fetchone()
+        db_cursor.execute('SELECT * FROM patients WHERE id = %s', (patient_id,))
+        patient_row = db_cursor.fetchone()
         
-        if not patient:
+        if not patient_row:
             return jsonify({'error': 'Patient not found'}), 404
+
+        # Convert patient row to dictionary for easier access
+        patient_columns = [desc[0] for desc in db_cursor.description]
+        patient = dict(zip(patient_columns, patient_row))
         
         # Get all tests for the patient
         db_cursor.execute('''
             SELECT * FROM tests 
-            WHERE patient_id = ? 
+            WHERE patient_id = %s 
             ORDER BY test_category, test_subcategory, created_at DESC
         ''', (patient_id,))
-        tests = db_cursor.fetchall()
+        tests_rows = db_cursor.fetchall()
         
         conn.close()
         
         # Convert tests to list of dictionaries and calculate status
         test_list = []
-        for test in tests:
+        test_columns = [desc[0] for desc in db_cursor.description]
+
+        for test_row in tests_rows:
+            test = dict(zip(test_columns, test_row))
+            
             # Calculate status
-            value = test[5]
-            ref_range = str(test[6])
+            value = test['test_value']
+            ref_range = str(test['normal_range'])
             status = 'Normal'
+            
             # parse reference range (e.g., '32–36', 'M: 13–16; F: 11.5–14.5', '<1.1', 'Up to 60')
             ref = ref_range.replace('–', '-').replace(' ', '')
             match = re.match(r'^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$', ref)
             if match:
                 low, high = float(match.group(1)), float(match.group(2))
-                if value < low:
+                if float(value) < low:
                     status = 'Low'
-                elif value > high:
+                elif float(value) > high:
                     status = 'High'
             elif ref.startswith('<'):
                 try:
                     high = float(ref[1:])
-                    if value >= high:
+                    if float(value) >= high:
                         status = 'High'
                 except:
                     pass
             elif ref.lower().startswith('upto') or ref.lower().startswith('up to'):
                 try:
                     high = float(re.findall(r'\d+(?:\.\d+)?', ref)[0])
-                    if value > high:
+                    if float(value) > high:
                         status = 'High'
                 except:
                     pass
-            # else: leave as Normal
+            elif ref.lower() == 'positive':
+                if str(value).lower() != 'positive':
+                    status = 'Abnormal' # Or some other specific status
+            elif ref.lower() == 'negative':
+                if str(value).lower() != 'negative':
+                    status = 'Abnormal' # Or some other specific status
+
             test_list.append({
-                'id': test[0],
-                'testCategory': test[2],
-                'testSubcategory': test[3],  # Add subcategory
-                'testName': test[4],
+                'id': test['id'],
+                'testCategory': test['test_category'],
+                'testSubcategory': test['test_subcategory'],
+                'testName': test['test_name'],
                 'testValue': value,
-                'normalRange': test[6],
-                'unit': test[7],
-                'additionalNote': test[9],
-                'createdAt': test[8],
+                'normalRange': test['normal_range'],
+                'unit': test['unit'],
+                'additionalNote': test['additional_note'],
+                'createdAt': test['created_at'].strftime('%Y-%m-%d %H:%M:%S') if test['created_at'] else None, # Format datetime objects
                 'status': status
             })
         
         # Create report object
         report = {
-            'patientName': patient[1],
-            'patientCode': patient[6],
-            'patientAge': patient[2],
-            'patientGender': patient[3],
-            'contactNumber': patient[4],
-            'refBy': patient[8],
+            'patientName': patient['full_name'],
+            'patientCode': patient['patient_code'],
+            'patientAge': patient['age'],
+            'patientGender': patient['gender'],
+            'contactNumber': patient['contact_number'],
+            'refBy': patient['ref_by'],
             'tests': test_list
         }
         
         return jsonify(report)
     except Exception as e:
+        print(f"Error generating report: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/login', methods=['POST', 'OPTIONS'])
@@ -669,14 +675,15 @@ def login():
         
         conn = get_db_connection()
         db_cursor = conn.cursor()
-        db_cursor.execute('SELECT id, password FROM users WHERE email = ?', (email,))
+        db_cursor.execute('SELECT id, password FROM users WHERE email = %s', (email,))
         user = db_cursor.fetchone()
         conn.close()
         
         if not user:
             return jsonify({'error': 'Invalid email address'}), 401
             
-        if not bcrypt.checkpw(password.encode('utf-8'), user[1]):
+        # user[1] is the hashed password from the database
+        if not bcrypt.checkpw(password.encode('utf-8'), user[1].encode('utf-8')):
             return jsonify({'error': 'Invalid password'}), 401
             
         payload = {
@@ -710,17 +717,17 @@ def update_admin_credentials():
         db_cursor = conn.cursor()
         
         # Verify current password
-        db_cursor.execute('SELECT password FROM users WHERE email = ?', (g.user['email'],))
+        db_cursor.execute('SELECT password FROM users WHERE email = %s', (request.user['email'],))
         user = db_cursor.fetchone()
         
-        if not user or not bcrypt.checkpw(current_password.encode('utf-8'), user[0]):
+        if not user or not bcrypt.checkpw(current_password.encode('utf-8'), user[0].encode('utf-8')):
             conn.close()
             return jsonify({'error': 'Current password is incorrect'}), 401
             
         # Update credentials
         hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
-        db_cursor.execute('UPDATE users SET email = ?, password = ? WHERE email = ?',
-                         (new_email, hashed_password, g.user['email']))
+        db_cursor.execute('UPDATE users SET email = %s, password = %s WHERE email = %s',
+                         (new_email, hashed_password.decode('utf-8'), request.user['email']))
         conn.commit()
         conn.close()
         
@@ -744,7 +751,7 @@ def track_report():
         # Insert report record
         db_cursor.execute('''
             INSERT INTO reports (patient_id)
-            VALUES (?)
+            VALUES (%s)
         ''', (data['patientId'],))
         
         conn.commit()
@@ -766,7 +773,7 @@ def get_reports_count():
         result = db_cursor.fetchone()
         conn.close()
         
-        return jsonify({'count': result['count']})
+        return jsonify({'count': result[0]}) # Access by index
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -775,7 +782,7 @@ def get_reports_count():
 def get_recent_reports():
     try:
         conn = get_db_connection()
-        db_cursor = conn.cursor()
+        db_cursor = conn.cursor(dictionary=True) # Fetch as dictionary
         
         # Get recent reports with patient names
         db_cursor.execute('''
@@ -788,40 +795,22 @@ def get_recent_reports():
         reports = db_cursor.fetchall()
         conn.close()
         
-        # Convert to list of dictionaries
-        report_list = []
-        for report in reports:
-            report_list.append({
-                'id': report['id'],
-                'patientId': report['patient_id'],
-                'patientName': report['patient_name'],
-                'generatedAt': report['generated_at']
-            })
-        
-        return jsonify(report_list)
+        return jsonify(reports)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Lab Info endpoints
 @app.route('/api/lab-info', methods=['GET'])
 @token_required
 def get_lab_info():
     try:
         conn = get_db_connection()
-        db_cursor = conn.cursor()
-        db_cursor.execute('SELECT * FROM lab_info LIMIT 1')
+        db_cursor = conn.cursor(dictionary=True)
+        db_cursor.execute('SELECT * FROM lab_info WHERE id = 1')
         lab_info = db_cursor.fetchone()
         conn.close()
-        
         if lab_info:
-            return jsonify({
-                'id': lab_info['id'],
-                'name': lab_info['name'],
-                'address': lab_info['address'],
-                'phone': lab_info['phone'],
-                'email': lab_info['email']
-            })
-        return jsonify(None)
+            return jsonify(lab_info)
+        return jsonify({'error': 'Lab info not found'}), 404
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -829,28 +818,16 @@ def get_lab_info():
 @token_required
 def add_lab_info():
     data = request.json
-    
-    # Validate required fields
     required_fields = ['name', 'address', 'phone', 'email']
     for field in required_fields:
         if field not in data:
             return jsonify({'error': f'Missing required field: {field}'}), 400
-    
     try:
         conn = get_db_connection()
         db_cursor = conn.cursor()
-        
-        # Check if lab info already exists
-        db_cursor.execute('SELECT COUNT(*) FROM lab_info')
-        count = db_cursor.fetchone()[0]
-        
-        if count > 0:
-            return jsonify({'error': 'Lab info already exists. Use PUT to update.'}), 400
-        
-        # Insert new lab info
         db_cursor.execute('''
             INSERT INTO lab_info (name, address, phone, email)
-            VALUES (?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s)
         ''', (
             data['name'],
             data['address'],
@@ -867,28 +844,16 @@ def add_lab_info():
 @token_required
 def update_lab_info():
     data = request.json
-    
-    # Validate required fields
     required_fields = ['name', 'address', 'phone', 'email']
     for field in required_fields:
         if field not in data:
             return jsonify({'error': f'Missing required field: {field}'}), 400
-    
     try:
         conn = get_db_connection()
         db_cursor = conn.cursor()
-        
-        # Check if lab info exists
-        db_cursor.execute('SELECT COUNT(*) FROM lab_info')
-        count = db_cursor.fetchone()[0]
-        
-        if count == 0:
-            return jsonify({'error': 'No lab info found to update. Use POST to create.'}), 404
-        
-        # Update lab info
         db_cursor.execute('''
             UPDATE lab_info 
-            SET name = ?, address = ?, phone = ?, email = ?
+            SET name = %s, address = %s, phone = %s, email = %s
             WHERE id = 1
         ''', (
             data['name'],
@@ -902,22 +867,16 @@ def update_lab_info():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Reference Doctors endpoints
 @app.route('/api/ref-doctors', methods=['GET'])
 @token_required
 def get_ref_doctors():
     try:
         conn = get_db_connection()
-        db_cursor = conn.cursor()
-        db_cursor.execute('SELECT * FROM ref_doctors ORDER BY name')
+        db_cursor = conn.cursor(dictionary=True) # Fetch as dictionary
+        db_cursor.execute('SELECT * FROM ref_doctors ORDER BY name ASC')
         doctors = db_cursor.fetchall()
         conn.close()
-        
-        return jsonify([{
-            'id': doc['id'],
-            'name': doc['name'],
-            'specialization': doc['specialization']
-        } for doc in doctors])
+        return jsonify(doctors)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -928,18 +887,21 @@ def add_ref_doctor():
         data = request.json
         if 'name' not in data:
             return jsonify({'error': 'Missing required field: name'}), 400
-
+        
         conn = get_db_connection()
         db_cursor = conn.cursor()
-        
         db_cursor.execute('''
             INSERT INTO ref_doctors (name, specialization)
-            VALUES (?, ?)
+            VALUES (%s, %s)
         ''', (data['name'], data.get('specialization')))
         
         conn.commit()
         conn.close()
         return jsonify({'message': 'Reference doctor added successfully'}), 201
+    except mysql.connector.IntegrityError as e:
+        if "Duplicate entry" in str(e) and "name" in str(e):
+            return jsonify({'error': 'Reference doctor with this name already exists'}), 400
+        return jsonify({'error': str(e)}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -950,25 +912,29 @@ def update_ref_doctor(doctor_id):
         data = request.json
         if 'name' not in data:
             return jsonify({'error': 'Missing required field: name'}), 400
-
+        
         conn = get_db_connection()
         db_cursor = conn.cursor()
         
         # Check if doctor exists
-        db_cursor.execute('SELECT id FROM ref_doctors WHERE id = ?', (doctor_id,))
+        db_cursor.execute('SELECT id FROM ref_doctors WHERE id = %s', (doctor_id,))
         if not db_cursor.fetchone():
             conn.close()
             return jsonify({'error': 'Reference doctor not found'}), 404
         
         db_cursor.execute('''
             UPDATE ref_doctors 
-            SET name = ?, specialization = ?
-            WHERE id = ?
+            SET name = %s, specialization = %s
+            WHERE id = %s
         ''', (data['name'], data.get('specialization'), doctor_id))
         
         conn.commit()
         conn.close()
         return jsonify({'message': 'Reference doctor updated successfully'}), 200
+    except mysql.connector.IntegrityError as e:
+        if "Duplicate entry" in str(e) and "name" in str(e):
+            return jsonify({'error': 'Reference doctor with this name already exists'}), 400
+        return jsonify({'error': str(e)}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -980,66 +946,77 @@ def delete_ref_doctor(doctor_id):
         db_cursor = conn.cursor()
         
         # Check if doctor exists
-        db_cursor.execute('SELECT id FROM ref_doctors WHERE id = ?', (doctor_id,))
+        db_cursor.execute('SELECT id FROM ref_doctors WHERE id = %s', (doctor_id,))
         if not db_cursor.fetchone():
             conn.close()
             return jsonify({'error': 'Reference doctor not found'}), 404
         
-        db_cursor.execute('DELETE FROM ref_doctors WHERE id = ?', (doctor_id,))
+        db_cursor.execute('DELETE FROM ref_doctors WHERE id = %s', (doctor_id,))
         conn.commit()
         conn.close()
         return jsonify({'message': 'Reference doctor deleted successfully'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Test Catalog endpoints
 @app.route('/api/tests/categories', methods=['GET'])
 @token_required
 def get_test_categories():
     try:
         conn = get_db_connection()
-        db_cursor = conn.cursor()
-        
-        # Get all tests grouped by category and subcategory
+        db_cursor = conn.cursor(dictionary=True) # Fetch as dictionary
+
+        # Get all tests without grouping or JSON functions
         db_cursor.execute('''
-            SELECT category, 
-                   subcategory,
-                   json_group_array(
-                       json_object(
-                           'id', id,
-                           'name', name,
-                           'referenceRange', reference_range,
-                           'unit', unit,
-                           'price', price
-                       )
-                   ) as tests
+            SELECT id, name, category, subcategory, reference_range, unit, price
             FROM test_catalog
-            GROUP BY category, subcategory
         ''')
-        
-        categories = db_cursor.fetchall()
+
+        all_tests = db_cursor.fetchall()
         conn.close()
-        
-        # Group by category first, then subcategory
+
+        # Group by category first, then subcategory in Python
         result = {}
-        for cat in categories:
-            category = cat['category']
-            subcategory = cat['subcategory']
-            tests = json.loads(cat['tests'])
-            
+        for test in all_tests:
+            category = test['category']
+            subcategory = test['subcategory']
+
             if category not in result:
                 result[category] = {
                     'category': category,
                     'subcategories': []
                 }
+
+            # Find existing subcategory or create a new one
+            found_subcategory = None
+            for sub_item in result[category]['subcategories']:
+                if sub_item['subcategory'] == subcategory:
+                    found_subcategory = sub_item
+                    break
             
-            result[category]['subcategories'].append({
-                'subcategory': subcategory,
-                'tests': tests
+            if not found_subcategory:
+                found_subcategory = {
+                    'subcategory': subcategory,
+                    'tests': []
+                }
+                result[category]['subcategories'].append(found_subcategory)
+            
+            found_subcategory['tests'].append({
+                'id': test['id'],
+                'name': test['name'],
+                'referenceRange': test['reference_range'],
+                'unit': test['unit'],
+                'price': test['price']
             })
         
+        # Sort subcategories and tests for consistent order
+        for category_data in result.values():
+            category_data['subcategories'].sort(key=lambda x: x['subcategory'])
+            for subcategory_data in category_data['subcategories']:
+                subcategory_data['tests'].sort(key=lambda x: x['name'])
+
         return jsonify(list(result.values()))
     except Exception as e:
+        print(f"Error fetching test categories: {str(e)}") # Add logging for debugging
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/patients/latest-code', methods=['GET'])
@@ -1048,23 +1025,26 @@ def get_latest_patient_code():
     try:
         conn = get_db_connection()
         db_cursor = conn.cursor()
-        
-        # Get the latest patient code
         db_cursor.execute('SELECT patient_code FROM patients ORDER BY id DESC LIMIT 1')
-        latest = db_cursor.fetchone()
+        latest_code_row = db_cursor.fetchone()
         conn.close()
-        
-        if latest:
-            # Extract the number from the code (e.g., "PAT000001" -> 1)
-            last_num = int(latest['patient_code'][3:])
-            next_num = last_num + 1
+
+        if latest_code_row and latest_code_row[0]:
+            latest_code = latest_code_row[0]
+            # Extract number, increment, and format to PAT000001
+            match = re.match(r'PAT(\d+)', latest_code)
+            if match:
+                num = int(match.group(1))
+                new_num = num + 1
+                new_code = f'PAT{new_num:06d}' # Format as PAT000001, PAT000002, etc.
+            else:
+                new_code = 'PAT000001' # Fallback if format is unexpected
         else:
-            next_num = 1
-            
-        # Format the new code (e.g., "PAT000001")
-        new_code = f"PAT{next_num:06d}"
+            new_code = 'PAT000001' # First patient
+
         return jsonify({'code': new_code})
     except Exception as e:
+        print(f"Error fetching latest patient code: {str(e)}") # Add logging for debugging
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/test-results/<int:test_id>', methods=['DELETE'])
@@ -1075,16 +1055,15 @@ def delete_test_result(test_id):
         db_cursor = conn.cursor()
         
         # Check if test result exists
-        db_cursor.execute('SELECT id FROM tests WHERE id = ?', (test_id,))
+        db_cursor.execute('SELECT id FROM tests WHERE id = %s', (test_id,))
         if not db_cursor.fetchone():
             conn.close()
             return jsonify({'error': 'Test result not found'}), 404
         
         # Delete test result
-        db_cursor.execute('DELETE FROM tests WHERE id = ?', (test_id,))
+        db_cursor.execute('DELETE FROM tests WHERE id = %s', (test_id,))
         conn.commit()
         conn.close()
-        
         return jsonify({'message': 'Test result deleted successfully'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1094,147 +1073,127 @@ def delete_test_result(test_id):
 def get_profile():
     try:
         conn = get_db_connection()
-        db_cursor = conn.cursor()
+        db_cursor = conn.cursor(dictionary=True) # Fetch as dictionary
         
         # Get user profile from database using user_id from token
-        db_cursor.execute('SELECT email, full_name, phone, role FROM users WHERE id = ?', 
-                         (request.user['user_id'],))
+        db_cursor.execute('SELECT email, full_name, phone, role FROM users WHERE id = %s', 
+                           (request.user['user_id'],))
         user = db_cursor.fetchone()
         conn.close()
         
-        if not user:
-            return jsonify({'error': 'User not found'}), 404
-        
-        return jsonify({
-            'email': user['email'],
-            'fullName': user['full_name'],
-            'phone': user['phone'],
-            'role': user['role']
-        })
+        if user:
+            return jsonify({
+                'email': user['email'],
+                'fullName': user['full_name'],
+                'phone': user['phone'],
+                'role': user['role']
+            })
+        return jsonify({'error': 'User profile not found'}), 404
     except Exception as e:
-        print(f"Profile error: {str(e)}")  # Add logging
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/profile', methods=['PUT'])
 @token_required
 def update_profile():
     try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
-            
+        data = request.json
         conn = get_db_connection()
         db_cursor = conn.cursor()
         
-        # Update user profile
         db_cursor.execute('''
             UPDATE users 
-            SET full_name = ?, phone = ?, role = ?
-            WHERE id = ?
+            SET full_name = %s, phone = %s, role = %s
+            WHERE id = %s
         ''', (
             data.get('fullName'),
             data.get('phone'),
             data.get('role'),
             request.user['user_id']
         ))
-        
-        if db_cursor.rowcount == 0:
-            conn.close()
-            return jsonify({'error': 'User not found'}), 404
-        
         conn.commit()
         conn.close()
-        
-        return jsonify({
-            'message': 'Profile updated successfully',
-            'email': request.user['email'],
-            'fullName': data.get('fullName'),
-            'phone': data.get('phone'),
-            'role': data.get('role')
-        })
+        return jsonify({'message': 'Profile updated successfully'}), 200
     except Exception as e:
-        print(f"Profile update error: {str(e)}")  # Add logging
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/security/change-email', methods=['POST'])
 @token_required
 def change_email():
     try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
-            
-        new_email = data.get('newEmail')
+        data = request.json
         current_password = data.get('currentPassword')
-        
-        if not new_email or not current_password:
-            return jsonify({'error': 'Missing required fields'}), 400
-            
+        new_email = data.get('newEmail')
+
+        if not current_password or not new_email:
+            return jsonify({'error': 'Missing current password or new email'}), 400
+
         conn = get_db_connection()
         db_cursor = conn.cursor()
         
         # Verify current password
-        db_cursor.execute('SELECT password FROM users WHERE id = ?', (request.user['user_id'],))
+        db_cursor.execute('SELECT password FROM users WHERE id = %s', (request.user['user_id'],))
         user = db_cursor.fetchone()
         
-        if not user or not bcrypt.checkpw(current_password.encode('utf-8'), user['password']):
+        if not user or not bcrypt.checkpw(current_password.encode('utf-8'), user[0].encode('utf-8')):
             conn.close()
             return jsonify({'error': 'Current password is incorrect'}), 401
             
         # Check if new email already exists
-        db_cursor.execute('SELECT id FROM users WHERE email = ?', (new_email,))
+        db_cursor.execute('SELECT id FROM users WHERE email = %s', (new_email,))
         if db_cursor.fetchone():
             conn.close()
             return jsonify({'error': 'Email already in use'}), 400
             
         # Update email
-        db_cursor.execute('UPDATE users SET email = ? WHERE id = ?',
-                         (new_email, request.user['user_id']))
+        db_cursor.execute('UPDATE users SET email = %s WHERE id = %s',
+                          (new_email, request.user['user_id']))
         conn.commit()
         conn.close()
-        
-        return jsonify({'message': 'Email updated successfully'})
-        
+        return jsonify({'message': 'Email updated successfully'}), 200
     except Exception as e:
-        print(f"Email change error: {str(e)}")  # Add logging
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/security/change-password', methods=['POST'])
 @token_required
 def change_password():
     try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
-            
+        data = request.json
         current_password = data.get('currentPassword')
         new_password = data.get('newPassword')
-        
+
         if not current_password or not new_password:
-            return jsonify({'error': 'Missing required fields'}), 400
-            
+            return jsonify({'error': 'Missing current password or new password'}), 400
+
         conn = get_db_connection()
         db_cursor = conn.cursor()
         
         # Verify current password
-        db_cursor.execute('SELECT password FROM users WHERE id = ?', (request.user['user_id'],))
+        db_cursor.execute('SELECT password FROM users WHERE id = %s', (request.user['user_id'],))
         user = db_cursor.fetchone()
         
-        if not user or not bcrypt.checkpw(current_password.encode('utf-8'), user['password']):
+        if not user or not bcrypt.checkpw(current_password.encode('utf-8'), user[0].encode('utf-8')):
             conn.close()
             return jsonify({'error': 'Current password is incorrect'}), 401
             
         # Update password
         hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
-        db_cursor.execute('UPDATE users SET password = ? WHERE id = ?',
-                         (hashed_password, request.user['user_id']))
+        db_cursor.execute('UPDATE users SET password = %s WHERE id = %s',
+                          (hashed_password.decode('utf-8'), request.user['user_id']))
         conn.commit()
         conn.close()
-        
-        return jsonify({'message': 'Password updated successfully'})
-        
+        return jsonify({'message': 'Password updated successfully'}), 200
     except Exception as e:
-        print(f"Password change error: {str(e)}")  # Add logging
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/current-date', methods=['GET'])
+@token_required
+def get_current_date():
+    try:
+        # Get current date in YYYY-MM-DD format
+        current_date = datetime.now().strftime('%Y-%m-%d')
+        return jsonify({'date': current_date}), 200
+    except Exception as e:
+        print(f"Error fetching current date: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

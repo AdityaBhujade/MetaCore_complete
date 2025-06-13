@@ -7,7 +7,7 @@ const AddTestResults = ({ onTestAdded }) => {
     { category: '', subcategory: '', testName: '', value: '', normalRange: '', unit: '' },
   ]);
   const [patientId, setPatientId] = useState('');
-  const [testDate, setTestDate] = useState(new Date().toISOString().split('T')[0]);
+  const [testDate, setTestDate] = useState(''); // Initialize as empty string, will fetch from backend
   const [notes, setNotes] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -24,6 +24,16 @@ const AddTestResults = ({ onTestAdded }) => {
       setLoadingPatients(true);
       setLoadingTests(true);
       try {
+        // Fetch current date from backend
+        const dateRes = await testService.getCurrentDate();
+        if (dateRes.success) {
+          setTestDate(dateRes.data.date);
+        } else {
+          console.error('Failed to fetch current date:', dateRes.error);
+          // Fallback to local date if backend fails
+          setTestDate(new Date().toISOString().split('T')[0]);
+        }
+
         // Fetch patients
         const patientsRes = await patientService.getAll();
         if (patientsRes.success) {
@@ -468,11 +478,12 @@ const TestHistory = ({ refreshFlag }) => {
         if (!testsRes.success) {
           throw new Error('Failed to fetch tests');
         }
-        setTests(testsRes.data || []); // Ensure tests is always an array
+        console.log('Fetched tests:', testsRes.data); // Debug log
+        setTests(testsRes.data || []);
       } catch (err) {
         console.error('Error fetching data:', err);
         setError('Failed to load test history');
-        setTests([]); // Set empty array on error
+        setTests([]);
       }
       setLoading(false);
     };
@@ -482,8 +493,8 @@ const TestHistory = ({ refreshFlag }) => {
   // Group tests by patientId
   const grouped = {};
   tests.forEach(test => {
-    if (!grouped[test.patientId]) grouped[test.patientId] = [];
-    grouped[test.patientId].push(test);
+    if (!grouped[test.patient_id]) grouped[test.patient_id] = [];
+    grouped[test.patient_id].push(test);
   });
 
   // Filter patients by search
@@ -538,46 +549,46 @@ const TestHistory = ({ refreshFlag }) => {
         filteredPatientIds.map((pid, idx) => (
           <div key={pid} className="mb-10">
             <div className="font-bold text-lg mb-2">{idx + 1}. {getPatientName(pid)}</div>
-      <div className="overflow-x-auto">
+            <div className="overflow-x-auto">
               <table className="min-w-full border text-sm mb-2 rounded-lg overflow-hidden shadow-sm">
-          <thead>
+                <thead>
                   <tr className="bg-blue-50 text-gray-700">
-              <th className="px-4 py-2 border">Category</th>
-              <th className="px-4 py-2 border">Date</th>
+                    <th className="px-4 py-2 border">Category</th>
+                    <th className="px-4 py-2 border">Date</th>
                     <th className="px-4 py-2 border">Test Name</th>
                     <th className="px-4 py-2 border">Value</th>
                     <th className="px-4 py-2 border">Normal Range</th>
                     <th className="px-4 py-2 border">Unit</th>
-              <th className="px-4 py-2 border">Notes</th>
+                    <th className="px-4 py-2 border">Notes</th>
                     <th className="px-4 py-2 border text-center">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-                  {grouped[pid].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map((test, tIdx) => (
+                  </tr>
+                </thead>
+                <tbody>
+                  {grouped[pid].sort((a, b) => new Date(b.test_date) - new Date(a.test_date)).map((test, tIdx) => (
                     <tr key={test.id} className={tIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="px-4 py-2 border align-top">{test.category}</td>
-                      <td className="px-4 py-2 border align-top whitespace-nowrap">{new Date(test.createdAt).toLocaleString()}</td>
-                      <td className="px-4 py-2 border align-top">{test.testName || '-'}</td>
-                      <td className="px-4 py-2 border align-top">{test.value || '-'}</td>
-                      <td className="px-4 py-2 border align-top">{test.normalRange || '-'}</td>
+                      <td className="px-4 py-2 border align-top">{test.test_category}</td>
+                      <td className="px-4 py-2 border align-top whitespace-nowrap">{new Date(test.test_date).toLocaleString()}</td>
+                      <td className="px-4 py-2 border align-top">{test.test_name || '-'}</td>
+                      <td className="px-4 py-2 border align-top">{test.test_value || '-'}</td>
+                      <td className="px-4 py-2 border align-top">{test.normal_range || '-'}</td>
                       <td className="px-4 py-2 border align-top">{test.unit || '-'}</td>
-                      <td className="px-4 py-2 border align-top">{test.notes || '-'}</td>
+                      <td className="px-4 py-2 border align-top">{test.additional_note || '-'}</td>
                       <td className="px-4 py-2 border align-top text-center">
-                  <button
+                        <button
                           className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-red-100 focus:outline-none"
                           onClick={() => handleDelete(test.id)}
-                    title="Delete test result"
-                  >
+                          title="Delete test result"
+                        >
                           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-red-600">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                           </svg>
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         ))
       )}

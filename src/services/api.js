@@ -192,6 +192,14 @@ export const testService = {
     } catch (error) {
       return { success: false, error: error.response?.data?.error || 'Failed to fetch test categories' };
     }
+  },
+  getCurrentDate: async () => {
+    try {
+      const response = await api.get('/current-date');
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: error.response?.data?.error || 'Failed to fetch current date' };
+    }
   }
 };
 
