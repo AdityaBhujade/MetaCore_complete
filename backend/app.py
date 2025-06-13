@@ -151,19 +151,34 @@ def init_db():
 def init_user_table():
     conn = get_db_connection()
     db_cursor = conn.cursor()
+    
+    # Create users table if it doesn't exist
     db_cursor.execute('''CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL
+        password TEXT NOT NULL,
+        full_name TEXT,
+        phone TEXT,
+        role TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
     
-    # Remove any existing admin users
-    db_cursor.execute('DELETE FROM users')
+    # Check if any users exist
+    db_cursor.execute('SELECT COUNT(*) as count FROM users')
+    user_count = db_cursor.fetchone()['count']
     
-    # Create new admin user
-    hashed_password = bcrypt.hashpw('metacore@admin123'.encode('utf-8'), bcrypt.gensalt())
-    db_cursor.execute('INSERT INTO users (email, password) VALUES (?, ?)', 
-                     ('admin@metacore.com', hashed_password))
+    # Only create admin user if this is the first time (no users exist)
+    if user_count == 0:
+        # Get admin credentials from environment variables
+        admin_email = os.getenv('ADMIN_EMAIL', 'admin@metacore.com')
+        admin_password = os.getenv('ADMIN_PASSWORD', 'metacore@admin123')
+        
+        # Create admin user
+        hashed_password = bcrypt.hashpw(admin_password.encode('utf-8'), bcrypt.gensalt())
+        db_cursor.execute('INSERT INTO users (email, password, full_name, role) VALUES (?, ?, ?, ?)', 
+                         (admin_email, hashed_password, 'Admin User', 'admin'))
+        print(f"Created initial admin user with email: {admin_email}")
+    
     conn.commit()
     conn.close()
 
@@ -1039,6 +1054,154 @@ def delete_test_result(test_id):
         
         return jsonify({'message': 'Test result deleted successfully'}), 200
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/profile', methods=['GET'])
+@token_required
+def get_profile():
+    try:
+        conn = get_db_connection()
+        db_cursor = conn.cursor()
+        
+        # Get user profile from database using user_id from token
+        db_cursor.execute('SELECT email, full_name, phone, role FROM users WHERE id = ?', 
+                         (request.user['user_id'],))
+        user = db_cursor.fetchone()
+        conn.close()
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        return jsonify({
+            'email': user['email'],
+            'fullName': user['full_name'],
+            'phone': user['phone'],
+            'role': user['role']
+        })
+    except Exception as e:
+        print(f"Profile error: {str(e)}")  # Add logging
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/profile', methods=['PUT'])
+@token_required
+def update_profile():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+            
+        conn = get_db_connection()
+        db_cursor = conn.cursor()
+        
+        # Update user profile
+        db_cursor.execute('''
+            UPDATE users 
+            SET full_name = ?, phone = ?, role = ?
+            WHERE id = ?
+        ''', (
+            data.get('fullName'),
+            data.get('phone'),
+            data.get('role'),
+            request.user['user_id']
+        ))
+        
+        if db_cursor.rowcount == 0:
+            conn.close()
+            return jsonify({'error': 'User not found'}), 404
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'message': 'Profile updated successfully',
+            'email': request.user['email'],
+            'fullName': data.get('fullName'),
+            'phone': data.get('phone'),
+            'role': data.get('role')
+        })
+    except Exception as e:
+        print(f"Profile update error: {str(e)}")  # Add logging
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/security/change-email', methods=['POST'])
+@token_required
+def change_email():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+            
+        new_email = data.get('newEmail')
+        current_password = data.get('currentPassword')
+        
+        if not new_email or not current_password:
+            return jsonify({'error': 'Missing required fields'}), 400
+            
+        conn = get_db_connection()
+        db_cursor = conn.cursor()
+        
+        # Verify current password
+        db_cursor.execute('SELECT password FROM users WHERE id = ?', (request.user['user_id'],))
+        user = db_cursor.fetchone()
+        
+        if not user or not bcrypt.checkpw(current_password.encode('utf-8'), user['password']):
+            conn.close()
+            return jsonify({'error': 'Current password is incorrect'}), 401
+            
+        # Check if new email already exists
+        db_cursor.execute('SELECT id FROM users WHERE email = ?', (new_email,))
+        if db_cursor.fetchone():
+            conn.close()
+            return jsonify({'error': 'Email already in use'}), 400
+            
+        # Update email
+        db_cursor.execute('UPDATE users SET email = ? WHERE id = ?',
+                         (new_email, request.user['user_id']))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'message': 'Email updated successfully'})
+        
+    except Exception as e:
+        print(f"Email change error: {str(e)}")  # Add logging
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/security/change-password', methods=['POST'])
+@token_required
+def change_password():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+            
+        current_password = data.get('currentPassword')
+        new_password = data.get('newPassword')
+        
+        if not current_password or not new_password:
+            return jsonify({'error': 'Missing required fields'}), 400
+            
+        conn = get_db_connection()
+        db_cursor = conn.cursor()
+        
+        # Verify current password
+        db_cursor.execute('SELECT password FROM users WHERE id = ?', (request.user['user_id'],))
+        user = db_cursor.fetchone()
+        
+        if not user or not bcrypt.checkpw(current_password.encode('utf-8'), user['password']):
+            conn.close()
+            return jsonify({'error': 'Current password is incorrect'}), 401
+            
+        # Update password
+        hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+        db_cursor.execute('UPDATE users SET password = ? WHERE id = ?',
+                         (hashed_password, request.user['user_id']))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'message': 'Password updated successfully'})
+        
+    except Exception as e:
+        print(f"Password change error: {str(e)}")  # Add logging
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

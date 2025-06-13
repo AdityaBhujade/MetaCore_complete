@@ -292,4 +292,55 @@ export const doctorService = {
   }
 };
 
+export const profileService = {
+  getProfile: async () => {
+    try {
+      const response = await api.get('/profile');
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: error.response?.data?.error || 'Failed to fetch profile' };
+    }
+  },
+  updateProfile: async (data) => {
+    try {
+      const response = await api.put('/profile', data);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: error.response?.data?.error || 'Failed to update profile' };
+    }
+  }
+};
+
+export const securityService = {
+  changeEmail: async (data) => {
+    try {
+      const response = await api.post('/security/change-email', data);
+      if (response.data.message === 'Email updated successfully') {
+        // Get new token with updated email
+        const tokenResponse = await api.post('/login', {
+          email: data.newEmail,
+          password: data.currentPassword
+        });
+        
+        if (tokenResponse.data.token) {
+          // Update stored token and auth data
+          localStorage.setItem('token', tokenResponse.data.token);
+          localStorage.setItem('auth', JSON.stringify({ email: data.newEmail }));
+        }
+      }
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: error.response?.data?.error || 'Failed to change email' };
+    }
+  },
+  changePassword: async (data) => {
+    try {
+      const response = await api.post('/security/change-password', data);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: error.response?.data?.error || 'Failed to change password' };
+    }
+  }
+};
+
 export default api; 

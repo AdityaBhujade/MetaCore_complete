@@ -3,14 +3,12 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 
 const Sidebar = () => {
-  const { signOut } = useAuth();
-
   return (
     <div className="h-screen w-64 bg-white border-r border-gray-200 fixed left-0 top-0 flex flex-col">
       <div className="p-6">
         <div className="flex items-center mb-8">
-          <img src="/logo.svg" alt="MetaCore Logo" className="w-8 h-8 mr-2" />
-          <span className="text-xl font-semibold">MetaCore</span>
+          <img src="/logo.svg" alt="MetaCore Logo" className="w-10 h-10 mr-3" />
+          <span className="text-2xl font-semibold">MetaCore</span>
         </div>
       </div>
       <nav className="mt-6 flex-1">
@@ -39,17 +37,6 @@ const Sidebar = () => {
           Administration
         </Link>
       </nav>
-      <div className="p-4 mt-auto">
-        <button
-          className="w-full bg-red-100 text-red-700 py-2 rounded font-semibold hover:bg-red-200 transition"
-          onClick={() => {
-            signOut();
-            window.location.href = '/login';
-          }}
-        >
-          Logout
-        </button>
-      </div>
     </div>
   );
 };
