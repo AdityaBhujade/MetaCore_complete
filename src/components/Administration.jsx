@@ -11,9 +11,12 @@ const Administration = () => {
   const [testForm, setTestForm] = useState({
     name: '',
     category: '',
+    subcategory: '',
     newCategory: '',
+    newSubcategory: '',
     referenceRange: '',
-    unit: ''
+    unit: '',
+    price: ''
   });
   const [refDoctorForm, setRefDoctorForm] = useState({
     name: '',
@@ -28,6 +31,7 @@ const Administration = () => {
   const [activeTab, setActiveTab] = useState('lab'); // 'lab', 'tests', 'doctors'
   const [editingTest, setEditingTest] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedSubcategory, setSelectedSubcategory] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingDoctor, setEditingDoctor] = useState(null);
 
@@ -87,7 +91,16 @@ const Administration = () => {
   };
 
   const handleTestChange = (e) => {
-    setTestForm({ ...testForm, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setTestForm(prev => {
+      const newForm = { ...prev, [name]: value };
+      // Reset subcategory when category changes
+      if (name === 'category') {
+        newForm.subcategory = '';
+        newForm.newSubcategory = '';
+      }
+      return newForm;
+    });
   };
 
   const handleRefDoctorChange = (e) => {
@@ -119,10 +132,18 @@ const Administration = () => {
     setError(null);
     setSuccess(null);
     try {
+      // If editing and using existing category/subcategory, don't require new ones
       const testData = {
         ...testForm,
-        category: testForm.newCategory || testForm.category
+        category: testForm.newCategory || testForm.category,
+        subcategory: testForm.newSubcategory || testForm.subcategory
       };
+
+      // Remove empty optional fields
+      if (!testData.referenceRange) delete testData.referenceRange;
+      if (!testData.unit) delete testData.unit;
+      if (!testData.price) delete testData.price;
+
       const response = editingTest 
         ? await testService.update(editingTest.id, testData)
         : await testService.create(testData);
@@ -132,9 +153,12 @@ const Administration = () => {
         setTestForm({
           name: '',
           category: '',
+          subcategory: '',
           newCategory: '',
+          newSubcategory: '',
           referenceRange: '',
-          unit: ''
+          unit: '',
+          price: ''
         });
         setEditingTest(null);
         // Reset category filter if we added a new category
@@ -168,14 +192,18 @@ const Administration = () => {
     }
   };
 
-  const handleEditTest = (test) => {
+  const handleEditTest = (test, category, subcategory) => {
     setEditingTest(test);
+    // Populate all existing test details in the form
     setTestForm({
-      name: test.name,
-      category: test.category,
-      newCategory: '',
-      referenceRange: test.referenceRange,
-      unit: test.unit
+      name: test.name || '',
+      category: category || '',
+      subcategory: subcategory || '',
+      newCategory: '', // Clear new category since we're using existing one
+      newSubcategory: '', // Clear new subcategory since we're using existing one
+      referenceRange: test.referenceRange || '',
+      unit: test.unit || '',
+      price: test.price || ''
     });
   };
 
@@ -203,26 +231,50 @@ const Administration = () => {
     setTestForm({
       name: '',
       category: '',
+      subcategory: '',
       newCategory: '',
+      newSubcategory: '',
       referenceRange: '',
-      unit: ''
+      unit: '',
+      price: ''
     });
   };
 
-  // Filter tests based on selected category and search query
-  const filteredTests = selectedCategory
-    ? tests.find(cat => cat.category === selectedCategory)?.tests || []
+  // Get unique categories and subcategories for the filter dropdowns
+  const categories = Array.from(new Set(tests.map(cat => cat.category)));
+  const subcategories = selectedCategory 
+    ? Array.from(new Set(tests
+        .find(cat => cat.category === selectedCategory)
+        ?.subcategories.map(sub => sub.subcategory) || []))
     : [];
 
-  // Apply search filter to tests
-  const searchFilteredTests = searchQuery
-    ? filteredTests.filter(test => 
-        test.name.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : filteredTests;
+  // Get subcategories for the add/edit form
+  const formSubcategories = testForm.category 
+    ? Array.from(new Set(tests
+        .find(cat => cat.category === testForm.category)
+        ?.subcategories.map(sub => sub.subcategory) || []))
+    : [];
 
-  // Get unique categories for the filter dropdown
-  const categories = tests.map(cat => cat.category);
+  // Filter tests based on search query, category, and subcategory
+  const filteredTests = tests
+    .filter(categoryData => 
+      !selectedCategory || categoryData.category === selectedCategory
+    )
+    .map(categoryData => ({
+      ...categoryData,
+      subcategories: categoryData.subcategories
+        .filter(subcategoryData =>
+          !selectedSubcategory || subcategoryData.subcategory === selectedSubcategory
+        )
+        .map(subcategoryData => ({
+          ...subcategoryData,
+          tests: subcategoryData.tests.filter(test =>
+            !searchQuery || test.name.toLowerCase().includes(searchQuery.toLowerCase())
+          )
+        }))
+        .filter(subcategoryData => subcategoryData.tests.length > 0)
+    }))
+    .filter(categoryData => categoryData.subcategories.length > 0);
 
   const handleEditDoctor = (doctor) => {
     setEditingDoctor(doctor);
@@ -272,6 +324,15 @@ const Administration = () => {
   const handleCancelEditDoctor = () => {
     setEditingDoctor(null);
     setRefDoctorForm({ name: '', specialization: '' });
+  };
+
+  const handleCategoryFilterChange = (e) => {
+    setSelectedCategory(e.target.value);
+    setSelectedSubcategory(''); // Reset subcategory when category changes
+  };
+
+  const handleSubcategoryFilterChange = (e) => {
+    setSelectedSubcategory(e.target.value);
   };
 
   return (
@@ -410,6 +471,22 @@ const Administration = () => {
                       </select>
                     </div>
                     <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Subcategory</label>
+                      <select
+                        name="subcategory"
+                        value={testForm.subcategory}
+                        onChange={handleTestChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        required={!testForm.newSubcategory}
+                        disabled={!testForm.category}
+                      >
+                        <option value="">Select Subcategory</option>
+                        {formSubcategories.map((subcategory) => (
+                          <option key={`subcategory-${subcategory}`} value={subcategory}>{subcategory}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">New Category (Optional)</label>
                       <input
                         type="text"
@@ -422,6 +499,18 @@ const Administration = () => {
                       />
                     </div>
                     <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">New Subcategory (Optional)</label>
+                      <input
+                        type="text"
+                        name="newSubcategory"
+                        value={testForm.newSubcategory}
+                        onChange={handleTestChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        placeholder="Enter new subcategory if needed"
+                        required={!testForm.subcategory}
+                      />
+                    </div>
+                    <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Reference Range</label>
                       <input
                         type="text"
@@ -429,7 +518,6 @@ const Administration = () => {
                         value={testForm.referenceRange}
                         onChange={handleTestChange}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                        required
                       />
                     </div>
                     <div>
@@ -440,26 +528,37 @@ const Administration = () => {
                         value={testForm.unit}
                         onChange={handleTestChange}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
+                      <input
+                        type="number"
+                        name="price"
+                        value={testForm.price}
+                        onChange={handleTestChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        step="0.01"
+                        min="0"
                       />
                     </div>
                   </div>
-                  <div className="mt-6 flex space-x-4">
+                  <div className="mt-6 flex justify-end space-x-4">
+                    {editingTest && (
+                      <button
+                        type="button"
+                        onClick={handleCancelEdit}
+                        className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                    )}
                     <button
                       type="submit"
                       className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                     >
                       {editingTest ? 'Update Test' : 'Add Test'}
                     </button>
-                    {editingTest && (
-                      <button
-                        type="button"
-                        onClick={handleCancelEdit}
-                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
-                      >
-                        Cancel
-                      </button>
-                    )}
                   </div>
                 </form>
               </div>
@@ -482,7 +581,7 @@ const Administration = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Category</label>
                       <select
                         value={selectedCategory}
-                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        onChange={handleCategoryFilterChange}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md"
                       >
                         <option value="">All Categories</option>
@@ -491,92 +590,64 @@ const Administration = () => {
                         ))}
                       </select>
                     </div>
+                    {selectedCategory && (
+                      <div className="w-64">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Subcategory</label>
+                        <select
+                          value={selectedSubcategory}
+                          onChange={handleSubcategoryFilterChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        >
+                          <option value="">All Subcategories</option>
+                          {subcategories.map((subcategory) => (
+                            <option key={`filter-sub-${subcategory}`} value={subcategory}>{subcategory}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {selectedCategory ? (
-                  // Show filtered tests for selected category
-                  <div className="overflow-x-auto">
-                    <table className="w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Name</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Reference Range</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">Unit</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {searchFilteredTests.map((test) => (
-                          <tr key={`test-${test.id}`}>
-                            <td className="px-4 py-4 text-sm text-gray-900 break-words">{test.name}</td>
-                            <td className="px-4 py-4 text-sm text-gray-900 break-words">{test.referenceRange}</td>
-                            <td className="px-4 py-4 text-sm text-gray-900 break-words">{test.unit}</td>
-                            <td className="px-4 py-4 text-sm text-gray-900 whitespace-nowrap">
-                              <button
-                                onClick={() => handleEditTest(test)}
-                                className="text-blue-600 hover:text-blue-900 mr-4"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => handleDeleteTest(test.id)}
-                                className="text-red-600 hover:text-red-900"
-                              >
-                                Delete
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  // Show all tests grouped by category
-                  <div className="space-y-6">
-                    {tests.map((categoryData) => {
-                      // Filter tests within each category based on search query
-                      const filteredCategoryTests = searchQuery
-                        ? categoryData.tests.filter(test => 
-                            test.name.toLowerCase().includes(searchQuery.toLowerCase())
-                          )
-                        : categoryData.tests;
-
-                      // Only show category if it has matching tests
-                      if (filteredCategoryTests.length === 0) return null;
-
-                      return (
-                        <div key={`category-${categoryData.category}`} className="border-b border-gray-200 pb-6 last:border-b-0">
-                          <h3 className="text-lg font-medium text-gray-900 mb-4">{categoryData.category}</h3>
+                <div className="space-y-6">
+                  {filteredTests.map((categoryData) => (
+                    <div key={`category-${categoryData.category}`} className="border-b border-gray-200 pb-6 last:border-b-0">
+                      <h3 className="text-lg font-medium text-gray-900 mb-4">{categoryData.category}</h3>
+                      {categoryData.subcategories.map(subcategory => (
+                        <div key={`subcategory-${subcategory.subcategory}`} className="ml-4 mb-4">
+                          <h4 className="text-md font-medium text-gray-800 mb-2">{subcategory.subcategory}</h4>
                           <div className="overflow-x-auto">
                             <table className="w-full divide-y divide-gray-200">
                               <thead className="bg-gray-50">
                                 <tr>
-                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Name</th>
-                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Reference Range</th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">Name</th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">Reference Range</th>
                                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">Unit</th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">Price</th>
                                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">Actions</th>
                                 </tr>
                               </thead>
                               <tbody className="bg-white divide-y divide-gray-200">
-                                {filteredCategoryTests.map((test) => (
-                                  <tr key={`test-${test.id}`}>
-                                    <td className="px-4 py-4 text-sm text-gray-900 break-words">{test.name}</td>
-                                    <td className="px-4 py-4 text-sm text-gray-900 break-words">{test.referenceRange}</td>
-                                    <td className="px-4 py-4 text-sm text-gray-900 break-words">{test.unit}</td>
-                                    <td className="px-4 py-4 text-sm text-gray-900 whitespace-nowrap">
-                                      <button
-                                        onClick={() => handleEditTest(test)}
-                                        className="text-blue-600 hover:text-blue-900 mr-4"
-                                      >
-                                        Edit
-                                      </button>
-                                      <button
-                                        onClick={() => handleDeleteTest(test.id)}
-                                        className="text-red-600 hover:text-red-900"
-                                      >
-                                        Delete
-                                      </button>
+                                {subcategory.tests.map((test) => (
+                                  <tr key={test.id} className="hover:bg-gray-50">
+                                    <td className="px-4 py-3 text-sm text-gray-900">{test.name}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-900">{test.referenceRange || '-'}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-900">{test.unit || '-'}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-900">{test.price || '-'}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
+                                      <div className="flex items-center space-x-3">
+                                        <button
+                                          onClick={() => handleEditTest(test, categoryData.category, subcategory.subcategory)}
+                                          className="text-blue-600 hover:text-blue-800"
+                                        >
+                                          Edit
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteTest(test.id)}
+                                          className="text-red-600 hover:text-red-800"
+                                        >
+                                          Delete
+                                        </button>
+                                      </div>
                                     </td>
                                   </tr>
                                 ))}
@@ -584,10 +655,10 @@ const Administration = () => {
                             </table>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -620,7 +691,6 @@ const Administration = () => {
                         value={refDoctorForm.specialization}
                         onChange={handleRefDoctorChange}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                        required
                       />
                     </div>
                   </div>

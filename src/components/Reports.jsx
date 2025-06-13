@@ -7,6 +7,7 @@ const Reports = () => {
     const [labInfo, setLabInfo] = useState(null);
     const [patients, setPatients] = useState([]);
     const [selectedPatient, setSelectedPatient] = useState(null);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [showDropdown, setShowDropdown] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -393,40 +394,60 @@ const Reports = () => {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">Generate Report</h2>
                 <div className="space-y-4">
-                    <div className="search-container relative">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Select Patient</label>
-                        <div className="relative">
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={handleSearchChange}
-                                onFocus={() => setShowDropdown(true)}
-                                placeholder="Search by patient name or code..."
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                            <span className="material-icons absolute right-3 top-2.5 text-gray-400">search</span>
-                        </div>
-                        {showDropdown && searchQuery && (
-                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                                {filteredPatients.length > 0 ? (
-                                    filteredPatients.map(patient => (
-                                        <div
-                                            key={patient.id}
-                                            onClick={() => handlePatientSelect(patient)}
-                                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center justify-between"
-                                        >
-                                            <div>
-                                                <div className="font-medium text-gray-900">{patient.fullName}</div>
-                                                <div className="text-sm text-gray-500">Code: {patient.patientCode}</div>
-                                            </div>
-                                            <span className="material-icons text-gray-400">arrow_forward</span>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="px-4 py-2 text-gray-500">No patients found</div>
-                                )}
+                    <div className="mb-6">
+                        <label className="block text-gray-700 font-semibold mb-1">Search Patient</label>
+                        <div className="patient-dropdown relative">
+                            <div 
+                                className="w-full border rounded px-3 py-2 flex items-center justify-between cursor-pointer bg-white"
+                                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                            >
+                                <span>
+                                    {selectedPatient ? 
+                                        patients.find(p => p.id === selectedPatient.id)?.fullName || 'Select a patient' : 
+                                        'Select a patient'
+                                    }
+                                </span>
+                                <span className="material-icons text-gray-400">
+                                    {isDropdownOpen ? 'expand_less' : 'expand_more'}
+                                </span>
                             </div>
-                        )}
+
+                            {isDropdownOpen && (
+                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg">
+                                    <div className="p-2">
+                                        <input
+                                            type="text"
+                                            className="w-full px-3 py-2 border rounded"
+                                            placeholder="Search patient..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            autoFocus
+                                        />
+                                    </div>
+                                    <div className="max-h-60 overflow-auto">
+                                        {filteredPatients.length > 0 ? (
+                                            filteredPatients.map(patient => (
+                                                <div
+                                                    key={patient.id}
+                                                    onClick={() => {
+                                                        handlePatientSelect(patient);
+                                                        setIsDropdownOpen(false);
+                                                        setSearchQuery('');
+                                                    }}
+                                                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                                                >
+                                                    <div className="font-medium">{patient.fullName}</div>
+                                                    <div className="text-sm text-gray-500">Code: {patient.patientCode}</div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="px-4 py-2 text-gray-500">No patients found</div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {selectedPatient && (

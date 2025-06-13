@@ -1,72 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { patientService, testService } from '../services/api';
 
-// Test catalog (biochemistry, hematology, microbiology, urine/stool)
-const TEST_CATALOG = [
-  // Biochemistry
-  { category: 'Biochemistry', name: 'Fasting Blood Sugar (FBS)', unit: 'mg/dL', ref: '70–110' },
-  { category: 'Biochemistry', name: 'Postprandial Blood Sugar (PPBS)', unit: 'mg/dL', ref: '110–160' },
-  { category: 'Biochemistry', name: 'Random Blood Sugar (RBS)', unit: 'mg/dL', ref: '70–140' },
-  { category: 'Biochemistry', name: 'HbA1c', unit: '%', ref: '4.4–6.7' },
-  { category: 'Biochemistry', name: 'Blood Urea Nitrogen (BUN)', unit: 'mg/dL', ref: '25–40' },
-  { category: 'Biochemistry', name: 'Serum Creatinine', unit: 'mg/dL', ref: '0.6–1.5' },
-  { category: 'Biochemistry', name: 'Uric Acid', unit: 'mg/dL', ref: 'M: 3.5–7.2; F: 2.6–6.0' },
-  { category: 'Biochemistry', name: 'Total Bilirubin', unit: 'mg/dL', ref: '0–1.2' },
-  { category: 'Biochemistry', name: 'Direct Bilirubin', unit: 'mg/dL', ref: '0–0.2' },
-  { category: 'Biochemistry', name: 'Indirect Bilirubin', unit: 'mg/dL', ref: '0.1–1.1' },
-  { category: 'Biochemistry', name: 'SGOT (AST)', unit: 'U/L', ref: '8–40' },
-  { category: 'Biochemistry', name: 'SGPT (ALT)', unit: 'U/L', ref: '8–40' },
-  { category: 'Biochemistry', name: 'Alkaline Phosphatase (ALP)', unit: 'U/L', ref: '108–306' },
-  { category: 'Biochemistry', name: 'Gamma GT (GGT)', unit: 'U/L', ref: 'Up to 60' },
-  { category: 'Biochemistry', name: 'Total Protein', unit: 'g/dL', ref: '6–8' },
-  { category: 'Biochemistry', name: 'Albumin', unit: 'g/dL', ref: '3.5–5.5' },
-  { category: 'Biochemistry', name: 'Globulin', unit: 'g/dL', ref: '2.5–3.5' },
-  { category: 'Biochemistry', name: 'A/G Ratio', unit: 'Ratio', ref: '1.2–2.2' },
-  { category: 'Biochemistry', name: 'Calcium (Total)', unit: 'mg/dL', ref: '8.5–10.5' },
-  { category: 'Biochemistry', name: 'Phosphorus', unit: 'mg/dL', ref: '2.5–5.0' },
-  { category: 'Biochemistry', name: 'Sodium', unit: 'mEq/L', ref: '135–145' },
-  { category: 'Biochemistry', name: 'Potassium', unit: 'mEq/L', ref: '3.5–5.0' },
-  { category: 'Biochemistry', name: 'Chloride', unit: 'mEq/L', ref: '98–119' },
-  { category: 'Biochemistry', name: 'Lipid Profile', unit: '-', ref: 'Varies per component' },
-  { category: 'Biochemistry', name: 'Amylase', unit: 'U/L', ref: 'Up to 85' },
-  { category: 'Biochemistry', name: 'Lipase', unit: 'U/L', ref: 'Up to 200' },
-  // Hematology
-  { category: 'Hematology', name: 'Hemoglobin (Hb)', unit: 'g/dL', ref: 'M: 13–16; F: 11.5–14.5' },
-  { category: 'Hematology', name: 'Total Leukocyte Count (TLC)', unit: 'x10³/μL', ref: '4–11' },
-  { category: 'Hematology', name: 'Red Blood Cell Count (RBC)', unit: 'x10⁶/μL', ref: 'M: 4.5–6.0; F: 4.0–4.5' },
-  { category: 'Hematology', name: 'Packed Cell Volume (PCV)', unit: '%', ref: 'M: 42–52; F: 36–48' },
-  { category: 'Hematology', name: 'Mean Corpuscular Volume (MCV)', unit: 'fL', ref: '82–92' },
-  { category: 'Hematology', name: 'Mean Corpuscular Hemoglobin (MCH)', unit: 'pg', ref: '27–32' },
-  { category: 'Hematology', name: 'Mean Corpuscular Hemoglobin Concentration (MCHC)', unit: 'g/dL', ref: '32–36' },
-  { category: 'Hematology', name: 'Differential Leukocyte Count (DLC)', unit: '%', ref: 'Neutrophils: 40–75; Lymphocytes: 20–45; Monocytes: 2–8; Eosinophils: 1–6; Basophils: 0–1' },
-  { category: 'Hematology', name: 'Erythrocyte Sedimentation Rate (ESR)', unit: 'mm/hr', ref: 'M: up to 15; F: up to 20' },
-  { category: 'Hematology', name: 'Reticulocyte Count', unit: '%', ref: 'Adult: 0.5–2; Infant: 2–6' },
-  { category: 'Hematology', name: 'Bleeding Time', unit: 'minutes', ref: '2–7' },
-  { category: 'Hematology', name: 'Clotting Time', unit: 'minutes', ref: '4–9' },
-  { category: 'Hematology', name: 'Prothrombin Time (PT)', unit: 'seconds', ref: '10–14' },
-  { category: 'Hematology', name: 'International Normalized Ratio (INR)', unit: 'Ratio', ref: '<1.1' },
-  { category: 'Hematology', name: 'Activated Partial Thromboplastin Time (APTT)', unit: 'seconds', ref: '30–40' },
-  // Microbiology & Serology
-  { category: 'Microbiology', name: 'Widal Test', unit: '-', ref: 'Negative' },
-  { category: 'Microbiology', name: 'HIV Test', unit: '-', ref: 'Negative' },
-  { category: 'Microbiology', name: 'HCV Test', unit: '-', ref: 'Negative' },
-  { category: 'Microbiology', name: 'HBsAg Test', unit: '-', ref: 'Negative' },
-  { category: 'Microbiology', name: 'Dengue NS1 Antigen', unit: '-', ref: 'Negative' },
-  { category: 'Microbiology', name: 'Dengue IgG/IgM', unit: '-', ref: 'Negative' },
-  { category: 'Microbiology', name: 'Malaria Parasite Test', unit: '-', ref: 'Negative' },
-  { category: 'Microbiology', name: 'Mantoux Test', unit: 'mm', ref: '<5 mm (negative)' },
-  // Urine and Stool
-  { category: 'Urine/Stool', name: 'Urine Routine Examination', unit: '-', ref: 'Normal' },
-  { category: 'Urine/Stool', name: 'Urine Pregnancy Test', unit: '-', ref: 'Negative' },
-  { category: 'Urine/Stool', name: 'Stool Routine Examination', unit: '-', ref: 'Normal' },
-];
-
 const AddTestResults = ({ onTestAdded }) => {
   const [tests, setTests] = useState([
-    { testName: '', value: '', normalRange: '', unit: '' },
+    { category: '', subcategory: '', testName: '', value: '', normalRange: '', unit: '' },
   ]);
   const [patientId, setPatientId] = useState('');
-  const [category, setCategory] = useState('');
+  const [testDate, setTestDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -74,11 +14,8 @@ const AddTestResults = ({ onTestAdded }) => {
   const [loadingPatients, setLoadingPatients] = useState(true);
   const [availableTests, setAvailableTests] = useState([]);
   const [loadingTests, setLoadingTests] = useState(true);
-
-  // Get available tests for the selected category
-  const filteredTests = category 
-    ? availableTests.filter(tc => tc.category === category)
-    : [];
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -96,14 +33,7 @@ const AddTestResults = ({ onTestAdded }) => {
         // Fetch tests
         const testsRes = await testService.getCategories();
         if (testsRes.success) {
-          // Flatten the nested structure
-          const flattenedTests = testsRes.data.flatMap(cat => 
-            cat.tests.map(test => ({
-              ...test,
-              category: cat.category
-            }))
-          );
-          setAvailableTests(flattenedTests);
+          setAvailableTests(testsRes.data);
         } else {
           console.error('Failed to fetch tests:', testsRes.error);
           setError('Failed to load test data. Please try again later.');
@@ -121,73 +51,114 @@ const AddTestResults = ({ onTestAdded }) => {
     fetchData();
   }, []);
 
-  // Reset tests when category changes
-  useEffect(() => {
-    setTests([{ testName: '', value: '', normalRange: '', unit: '' }]);
-  }, [category]);
+  const handleTestChange = (index, field, value) => {
+    const newTests = [...tests];
+    newTests[index] = { ...newTests[index], [field]: value };
 
-  const handleTestChange = (idx, field, value) => {
-    setTests((prev) => prev.map((t, i) => {
-      if (i !== idx) return t;
-      if (field === 'testName') {
-        const found = availableTests.find(tc => tc.name === value);
-        return {
-          ...t,
-          testName: value,
-          unit: found ? found.unit : '',
-          normalRange: found ? found.referenceRange : '',
-        };
+    // If category or subcategory changes, reset test name
+    if (field === 'category' || field === 'subcategory') {
+      newTests[index].testName = '';
+    }
+
+    // If test name changes, update normal range and unit
+    if (field === 'testName') {
+      const selectedTest = findTest(newTests[index].category, newTests[index].subcategory, value);
+      if (selectedTest) {
+        newTests[index].normalRange = selectedTest.referenceRange || '';
+        newTests[index].unit = selectedTest.unit || '';
       }
-      return { ...t, [field]: value };
-    }));
+    }
+
+    setTests(newTests);
   };
 
-  const addTestRow = () => {
-    setTests([...tests, { testName: '', value: '', normalRange: '', unit: '' }]);
+  const findTest = (category, subcategory, testName) => {
+    const categoryData = availableTests.find(cat => cat.category === category);
+    if (!categoryData) return null;
+
+    const subcategoryData = categoryData.subcategories.find(sub => sub.subcategory === subcategory);
+    if (!subcategoryData) return null;
+
+    return subcategoryData.tests.find(test => test.name === testName);
   };
 
-  const removeTestRow = (idx) => {
-    setTests(tests.filter((_, i) => i !== idx));
+  const addTest = () => {
+    setTests([...tests, { category: '', subcategory: '', testName: '', value: '', normalRange: '', unit: '' }]);
+  };
+
+  const removeTest = (index) => {
+    setTests(tests.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage('');
     setError('');
-    if (!patientId || !category || tests.some(t => !t.testName || !t.value)) {
-      setError('Please fill all required fields.');
-      return;
-    }
+    setMessage('');
+
     try {
-      // Format tests data to match backend requirements
-      const formattedTests = tests.map(test => ({
-        test_name: test.testName,
-        test_value: test.value,
-        normal_range: test.normalRange,
+      const testResults = tests.map(test => ({
+        testName: test.testName,
+        value: test.value,
+        normalRange: test.normalRange,
         unit: test.unit
       }));
 
       const response = await testService.addResults({
-        patient_id: Number(patientId),
-        test_category: category,
-        tests: formattedTests,
-        additional_note: notes
+        patientId,
+        category: tests[0].category,
+        subcategory: tests[0].subcategory,
+        tests: testResults,
+        testDate,
+        notes
       });
 
       if (response.success) {
-        setMessage('Test results saved successfully!');
-        setTests([{ testName: '', value: '', normalRange: '', unit: '' }]);
+        setMessage('Test results added successfully!');
+        setTests([{ category: '', subcategory: '', testName: '', value: '', normalRange: '', unit: '' }]);
         setPatientId('');
-        setCategory('');
+        setTestDate(new Date().toISOString().split('T')[0]);
         setNotes('');
         if (onTestAdded) onTestAdded();
       } else {
-        setError(response.error || 'Failed to save test results');
+        setError(response.error || 'Failed to add test results');
       }
-    } catch (err) {
-      setError('Failed to connect to server');
+    } catch (e) {
+      setError('Failed to add test results');
     }
   };
+
+  const handleClearForm = () => {
+    // Clear all selections and user-entered values
+    const clearedTests = tests.map(() => ({
+      category: '',
+      subcategory: '',
+      testName: '',
+      value: '',
+      normalRange: '',
+      unit: ''
+    }));
+    setTests(clearedTests);
+    setNotes(''); // Clear notes
+    setPatientId(''); // Clear patient selection
+    setTestDate(new Date().toISOString().split('T')[0]); // Reset to current date
+  };
+
+  const filteredPatients = patients.filter(patient => {
+    const searchLower = searchQuery.toLowerCase();
+    return patient.fullName.toLowerCase().includes(searchLower) || 
+           patient.patientCode.toLowerCase().includes(searchLower);
+  });
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.patient-dropdown')) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200">
@@ -196,45 +167,125 @@ const AddTestResults = ({ onTestAdded }) => {
       <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={handleSubmit}>
         <div>
           <label className="block text-gray-700 font-semibold mb-1">Patient *</label>
-          <select className="w-full border rounded px-3 py-2" value={patientId} onChange={e => setPatientId(e.target.value)} required>
-            <option key="patient-default" value="">{loadingPatients ? 'Loading...' : 'Select a patient'}</option>
-            {patients.map(p => (
-              <option key={`patient-${p.id}`} value={p.id}>{p.fullName} ({p.patientCode})</option>
-            ))}
-          </select>
+          <div className="patient-dropdown relative">
+            <div 
+              className="w-full border rounded px-3 py-2 flex items-center justify-between cursor-pointer bg-white"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            >
+              <span>
+                {patientId ? 
+                  patients.find(p => p.id === patientId)?.fullName || 'Select a patient' : 
+                  'Select a patient'
+                }
+              </span>
+              <span className="material-icons text-gray-400">
+                {isDropdownOpen ? 'expand_less' : 'expand_more'}
+              </span>
+            </div>
+
+            {isDropdownOpen && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg">
+                <div className="p-2">
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border rounded"
+                    placeholder="Search patient..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    autoFocus
+                  />
+                </div>
+                <div className="max-h-60 overflow-auto">
+                  {filteredPatients.length > 0 ? (
+                    filteredPatients.map(patient => (
+                      <div
+                        key={patient.id}
+                        onClick={() => {
+                          setPatientId(patient.id);
+                          setIsDropdownOpen(false);
+                          setSearchQuery('');
+                        }}
+                        className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                      >
+                        <div className="font-medium">{patient.fullName}</div>
+                        <div className="text-sm text-gray-500">Code: {patient.patientCode}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="px-4 py-2 text-gray-500">No patients found</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
+
         <div>
-          <label className="block text-gray-700 font-semibold mb-1">Test Category *</label>
-          <select 
-            className="w-full border rounded px-3 py-2" 
-            value={category} 
-            onChange={e => setCategory(e.target.value)} 
+          <label className="block text-gray-700 font-semibold mb-1">Test Date *</label>
+          <input
+            type="date"
+            className="w-full border rounded px-3 py-2"
+            value={testDate}
+            onChange={e => setTestDate(e.target.value)}
             required
-          >
-            <option key="category-default" value="">{loadingTests ? 'Loading...' : 'Select test category'}</option>
-            {Array.from(new Set(availableTests.map(tc => tc.category))).map(cat => (
-              <option key={`category-${cat}`} value={cat}>{cat}</option>
-            ))}
-          </select>
+          />
         </div>
+
         <div className="md:col-span-2">
           <div className="bg-gray-50 border rounded p-4 mt-4">
             <h3 className="text-lg font-semibold mb-4">Test Results</h3>
             {tests.map((test, idx) => (
-              <div key={`test-row-${idx}`} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end mb-4">
-                <div>
+              <div key={`test-row-${idx}`} className="grid grid-cols-1 md:grid-cols-9 gap-4 items-end mb-4">
+                <div className="md:col-span-2">
+                  <label className="block text-gray-700 font-semibold mb-1">Category *</label>
+                  <select
+                    className="w-full border rounded px-3 py-2"
+                    value={test.category}
+                    onChange={e => handleTestChange(idx, 'category', e.target.value)}
+                    required
+                  >
+                    <option value="">Select category</option>
+                    {availableTests.map(cat => (
+                      <option key={`category-${cat.category}`} value={cat.category}>{cat.category}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-gray-700 font-semibold mb-1">Subcategory *</label>
+                  <select
+                    className="w-full border rounded px-3 py-2"
+                    value={test.subcategory}
+                    onChange={e => handleTestChange(idx, 'subcategory', e.target.value)}
+                    required
+                    disabled={!test.category}
+                  >
+                    <option value="">Select subcategory</option>
+                    {test.category && availableTests
+                      .find(cat => cat.category === test.category)
+                      ?.subcategories.map(sub => (
+                        <option key={`subcategory-${sub.subcategory}`} value={sub.subcategory}>
+                          {sub.subcategory}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div className="md:col-span-2">
                   <label className="block text-gray-700 font-semibold mb-1">Test Name *</label>
                   <select
                     className="w-full border rounded px-3 py-2"
                     value={test.testName}
                     onChange={e => handleTestChange(idx, 'testName', e.target.value)}
                     required
-                    disabled={!category}
+                    disabled={!test.subcategory}
                   >
-                    <option key={`test-default-${idx}`} value="">Select test name</option>
-                    {filteredTests.map(tc => (
-                      <option key={`test-${tc.id}-${idx}`} value={tc.name}>{tc.name}</option>
-                    ))}
+                    <option value="">Select test name</option>
+                    {test.subcategory && availableTests
+                      .find(cat => cat.category === test.category)
+                      ?.subcategories.find(sub => sub.subcategory === test.subcategory)
+                      ?.tests.map(t => (
+                        <option key={`test-${t.id}`} value={t.name}>{t.name}</option>
+                      ))}
                   </select>
                 </div>
                 <div>
@@ -256,7 +307,7 @@ const AddTestResults = ({ onTestAdded }) => {
                     readOnly
                   />
                 </div>
-                <div>
+                <div className="w-20">
                   <label className="block text-gray-700 font-semibold mb-1">Unit</label>
                   <input
                     type="text"
@@ -265,29 +316,31 @@ const AddTestResults = ({ onTestAdded }) => {
                     readOnly
                   />
                 </div>
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => removeTestRow(idx)}
-                    className="text-red-600 hover:text-red-800"
-                    disabled={tests.length === 1}
-                  >
-                    Remove
+                {idx > 0 && (
+                  <div className="md:col-span-9 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => removeTest(idx)}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      Remove Test
                     </button>
-                </div>
+                  </div>
+                )}
               </div>
             ))}
             <button
               type="button"
-              onClick={addTestRow}
-              className="text-blue-600 hover:text-blue-800"
+              onClick={addTest}
+              className="mt-4 text-blue-600 hover:text-blue-800"
             >
               + Add Another Test
-              </button>
+            </button>
           </div>
         </div>
+
         <div className="md:col-span-2">
-          <label className="block text-gray-700 font-semibold mb-1">Additional Notes</label>
+          <label className="block text-gray-700 font-semibold mb-1">Notes</label>
           <textarea
             className="w-full border rounded px-3 py-2"
             value={notes}
@@ -295,24 +348,25 @@ const AddTestResults = ({ onTestAdded }) => {
             rows="3"
           />
         </div>
+
+        {error && <div className="md:col-span-2 text-red-600">{error}</div>}
+        {message && <div className="md:col-span-2 text-green-600">{message}</div>}
+
         <div className="md:col-span-2">
           <button
             type="submit"
             className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
           >
-            Save Test Results
+            Add Test Results
+          </button>
+          <button
+            type="button"
+            onClick={handleClearForm}
+            className="ml-4 bg-gray-100 text-gray-700 px-6 py-2 rounded hover:bg-gray-200"
+          >
+            Clear Form
           </button>
         </div>
-        {message && (
-          <div className="md:col-span-2 text-green-600">
-            {message}
-          </div>
-        )}
-        {error && (
-          <div className="md:col-span-2 text-red-600">
-            {error}
-        </div>
-        )}
       </form>
     </div>
   );

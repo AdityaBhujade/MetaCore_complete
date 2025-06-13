@@ -120,6 +120,22 @@ const AddEditPatient = ({ onPatientAdded, onCancel, editPatient }) => {
     }
   };
 
+  const handleClearForm = () => {
+    // Only clear user-entered values, preserve pre-filled values
+    setFormData(prevData => ({
+      ...prevData,
+      fullName: '',
+      age: '',
+      gender: '',
+      contactNumber: '',
+      email: '',
+      address: '',
+      refBy: '',
+      // Preserve patientCode if it was pre-filled
+      patientCode: prevData.patientCode
+    }));
+  };
+
   return (
     <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
       <h2 className="text-2xl font-bold mb-4">{editPatient ? 'Edit Patient' : 'Add New Patient'}</h2>
@@ -210,7 +226,7 @@ const AddEditPatient = ({ onPatientAdded, onCancel, editPatient }) => {
               <option value="">Select Doctor</option>
               {refDoctors.map(doctor => (
                 <option key={doctor.id} value={doctor.name}>
-                  {doctor.name} ({doctor.specialization})
+                  {doctor.name}{doctor.specialization ? ` (${doctor.specialization})` : ''}
                 </option>
               ))}
               <option value="Self">Self</option>
@@ -247,6 +263,13 @@ const AddEditPatient = ({ onPatientAdded, onCancel, editPatient }) => {
               Cancel
             </button>
           )}
+          <button
+            type="button"
+            onClick={handleClearForm}
+            className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            Clear Form
+          </button>
         </div>
       </form>
     </div>

@@ -83,16 +83,18 @@ def init_db():
         )
     ''')
 
-    # Create tests table if not exists
+    # Create tests table with updated schema
     db_cursor.execute('''
         CREATE TABLE IF NOT EXISTS tests (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             patient_id INTEGER NOT NULL,
             test_category TEXT NOT NULL,
+            test_subcategory TEXT NOT NULL,
             test_name TEXT NOT NULL,
-            test_value REAL NOT NULL,
-            normal_range TEXT NOT NULL,
-            unit TEXT NOT NULL,
+            test_value TEXT NOT NULL,
+            normal_range TEXT,
+            unit TEXT,
+            test_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             additional_note TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (patient_id) REFERENCES patients (id)
@@ -117,8 +119,10 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             category TEXT NOT NULL,
-            reference_range TEXT NOT NULL,
-            unit TEXT NOT NULL,
+            subcategory TEXT NOT NULL,
+            price REAL,
+            reference_range TEXT,
+            unit TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -128,7 +132,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS ref_doctors (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
-            specialization TEXT NOT NULL,
+            specialization TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -378,7 +382,7 @@ def get_tests():
 def add_test():
     try:
         data = request.json
-        required_fields = ['name', 'category', 'referenceRange', 'unit']
+        required_fields = ['name', 'category', 'subcategory']  # Only these are required
         for field in required_fields:
             if field not in data:
                 return jsonify({'error': f'Missing required field: {field}'}), 400
@@ -387,13 +391,15 @@ def add_test():
         db_cursor = conn.cursor()
         
         db_cursor.execute('''
-            INSERT INTO test_catalog (name, category, reference_range, unit)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO test_catalog (name, category, subcategory, reference_range, unit, price)
+            VALUES (?, ?, ?, ?, ?, ?)
         ''', (
             data['name'],
             data['category'],
-            data['referenceRange'],
-            data['unit']
+            data['subcategory'],
+            data.get('referenceRange'),  # Optional
+            data.get('unit'),  # Optional
+            data.get('price')  # Optional
         ))
         
         conn.commit()
@@ -407,7 +413,7 @@ def add_test():
 def add_test_results():
     try:
         data = request.json
-        required_fields = ['patient_id', 'test_category', 'tests']
+        required_fields = ['patientId', 'category', 'subcategory', 'tests']
         for field in required_fields:
             if field not in data:
                 return jsonify({'error': f'Missing required field: {field}'}), 400
@@ -415,28 +421,39 @@ def add_test_results():
         conn = get_db_connection()
         db_cursor = conn.cursor()
         
-        # Check if patient exists
-        db_cursor.execute('SELECT id FROM patients WHERE id = ?', (data['patient_id'],))
-        if not db_cursor.fetchone():
-            return jsonify({'error': 'Patient not found'}), 404
-
+        # Get test date from request or use current timestamp
+        test_date = data.get('testDate', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        
         # Insert each test result
         for test in data['tests']:
             db_cursor.execute('''
-                INSERT INTO tests (patient_id, test_category, test_name, test_value, normal_range, unit, additional_note)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO tests (
+                    patient_id, 
+                    test_category, 
+                    test_subcategory,
+                    test_name, 
+                    test_value, 
+                    normal_range, 
+                    unit, 
+                    test_date,
+                    additional_note
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                data['patient_id'],
-                data['test_category'],
-                test['test_name'],
-                test['test_value'],
-                test['normal_range'],
-                test['unit'],
-                data.get('additional_note', '')
+                data['patientId'],
+                data['category'],
+                data['subcategory'],
+                test['testName'],
+                test['value'],
+                test.get('normalRange'),
+                test.get('unit'),
+                test_date,
+                data.get('notes')
             ))
         
         conn.commit()
         conn.close()
+        
         return jsonify({'message': 'Test results added successfully'}), 201
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -448,7 +465,7 @@ def update_test(test_id):
         data = request.json
         
         # Validate required fields
-        required_fields = ['name', 'category', 'referenceRange', 'unit']
+        required_fields = ['name', 'category', 'subcategory']  # Only these are required
         for field in required_fields:
             if field not in data:
                 return jsonify({'error': f'Missing required field: {field}'}), 400
@@ -465,13 +482,15 @@ def update_test(test_id):
         # Update test
         db_cursor.execute('''
             UPDATE test_catalog 
-            SET name = ?, category = ?, reference_range = ?, unit = ?
+            SET name = ?, category = ?, subcategory = ?, reference_range = ?, unit = ?, price = ?
             WHERE id = ?
         ''', (
             data['name'],
             data['category'],
-            data['referenceRange'],
-            data['unit'],
+            data['subcategory'],
+            data.get('referenceRange'),  # Optional
+            data.get('unit'),  # Optional
+            data.get('price'),  # Optional
             test_id
         ))
         
@@ -906,10 +925,8 @@ def get_ref_doctors():
 def add_ref_doctor():
     try:
         data = request.json
-        required_fields = ['name', 'specialization']
-        for field in required_fields:
-            if field not in data:
-                return jsonify({'error': f'Missing required field: {field}'}), 400
+        if 'name' not in data:
+            return jsonify({'error': 'Missing required field: name'}), 400
 
         conn = get_db_connection()
         db_cursor = conn.cursor()
@@ -917,7 +934,7 @@ def add_ref_doctor():
         db_cursor.execute('''
             INSERT INTO ref_doctors (name, specialization)
             VALUES (?, ?)
-        ''', (data['name'], data['specialization']))
+        ''', (data['name'], data.get('specialization')))
         
         conn.commit()
         conn.close()
@@ -930,10 +947,8 @@ def add_ref_doctor():
 def update_ref_doctor(doctor_id):
     try:
         data = request.json
-        required_fields = ['name', 'specialization']
-        for field in required_fields:
-            if field not in data:
-                return jsonify({'error': f'Missing required field: {field}'}), 400
+        if 'name' not in data:
+            return jsonify({'error': 'Missing required field: name'}), 400
 
         conn = get_db_connection()
         db_cursor = conn.cursor()
@@ -948,7 +963,7 @@ def update_ref_doctor(doctor_id):
             UPDATE ref_doctors 
             SET name = ?, specialization = ?
             WHERE id = ?
-        ''', (data['name'], data['specialization'], doctor_id))
+        ''', (data['name'], data.get('specialization'), doctor_id))
         
         conn.commit()
         conn.close()
@@ -984,28 +999,45 @@ def get_test_categories():
         conn = get_db_connection()
         db_cursor = conn.cursor()
         
-        # Get all tests grouped by category
+        # Get all tests grouped by category and subcategory
         db_cursor.execute('''
             SELECT category, 
+                   subcategory,
                    json_group_array(
                        json_object(
                            'id', id,
                            'name', name,
                            'referenceRange', reference_range,
-                           'unit', unit
+                           'unit', unit,
+                           'price', price
                        )
                    ) as tests
             FROM test_catalog
-            GROUP BY category
+            GROUP BY category, subcategory
         ''')
         
         categories = db_cursor.fetchall()
         conn.close()
         
-        return jsonify([{
-            'category': cat['category'],
-            'tests': json.loads(cat['tests'])
-        } for cat in categories])
+        # Group by category first, then subcategory
+        result = {}
+        for cat in categories:
+            category = cat['category']
+            subcategory = cat['subcategory']
+            tests = json.loads(cat['tests'])
+            
+            if category not in result:
+                result[category] = {
+                    'category': category,
+                    'subcategories': []
+                }
+            
+            result[category]['subcategories'].append({
+                'subcategory': subcategory,
+                'tests': tests
+            })
+        
+        return jsonify(list(result.values()))
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
