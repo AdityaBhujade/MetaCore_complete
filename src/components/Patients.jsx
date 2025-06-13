@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { patientService, doctorService } from '../services/api';
+import { useNavigate } from 'react-router-dom';
 
 const AddEditPatient = ({ onPatientAdded, onCancel, editPatient }) => {
   const [formData, setFormData] = useState({
@@ -278,10 +279,10 @@ const AddEditPatient = ({ onPatientAdded, onCancel, editPatient }) => {
 
 const PatientList = ({ refreshFlag }) => {
   const [patients, setPatients] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [editingPatient, setEditingPatient] = useState(null);
   const [editFormData, setEditFormData] = useState({});
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchPatients();
@@ -289,15 +290,14 @@ const PatientList = ({ refreshFlag }) => {
 
   const fetchPatients = async () => {
     try {
-      setLoading(true);
       const response = await patientService.getAll();
       if (response.success) {
         setPatients(response.data);
       } else {
-        setError('Failed to fetch patients');
+        console.error('Failed to fetch patients:', response.error);
       }
     } catch (err) {
-      setError('Failed to connect to server');
+      console.error('Error fetching patients:', err);
     } finally {
       setLoading(false);
     }
@@ -312,13 +312,12 @@ const PatientList = ({ refreshFlag }) => {
       contactNumber: p.contactNumber,
       email: p.email,
       address: p.address,
-      refBy: p.refBy || ''
+      refBy: p.refBy
     });
   };
 
   const handleEditChange = (e) => {
-    const { name, value } = e.target;
-    setEditFormData(prev => ({ ...prev, [name]: value }));
+    setEditFormData({ ...editFormData, [e.target.name]: e.target.value });
   };
 
   const handleEditSave = async () => {
@@ -328,10 +327,10 @@ const PatientList = ({ refreshFlag }) => {
         setEditingPatient(null);
         fetchPatients();
       } else {
-        setError('Failed to update patient');
+        console.error('Failed to update patient:', response.error);
       }
     } catch (err) {
-      setError('Failed to connect to server');
+      console.error('Error updating patient:', err);
     }
   };
 
@@ -342,27 +341,26 @@ const PatientList = ({ refreshFlag }) => {
         if (response.success) {
           fetchPatients();
         } else {
-          setError('Failed to delete patient');
+          console.error('Failed to delete patient:', response.error);
         }
       } catch (err) {
-        setError('Failed to connect to server');
+        console.error('Error deleting patient:', err);
       }
     }
   };
 
+  const handleQuickAddTest = (patient) => {
+    // Store the selected patient in localStorage
+    localStorage.setItem('selectedPatient', JSON.stringify(patient));
+    // Navigate to tests page
+    navigate('/tests');
+  };
+
   if (loading) return <div className="p-4">Loading...</div>;
-  if (error) return <div className="p-4 text-red-600">{error}</div>;
-  if (patients.length === 0) return (
-    <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200 flex flex-col items-center">
-      <span className="text-5xl text-gray-300 mb-4">👥</span>
-      <div className="text-xl font-semibold text-gray-500 mb-2">No patients found.</div>
-      <div className="text-gray-400">Add patients to see them here.</div>
-    </div>
-  );
 
   return (
-    <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200">
-      <h2 className="text-2xl font-bold mb-2">Patient List</h2>
+    <div className="mt-8">
+      <h2 className="text-2xl font-bold mb-4">Patient List</h2>
       <div className="overflow-x-auto">
         <table className="min-w-full border text-sm">
           <thead>
@@ -412,6 +410,13 @@ const PatientList = ({ refreshFlag }) => {
                     <td className="px-4 py-2 border">{p.email}</td>
                     <td className="px-4 py-2 border"><span className="bg-gray-100 px-2 py-1 rounded text-xs">{p.refBy}</span></td>
                     <td className="px-4 py-2 border flex gap-2 items-center">
+                      <button 
+                        onClick={() => handleQuickAddTest(p)}
+                        className="bg-white border px-2 py-1 rounded text-blue-600" 
+                        title="Quick Add Test"
+                      >
+                        <span role="img" aria-label="add test">➕</span>
+                      </button>
                       <button className="bg-white border px-2 py-1 rounded" onClick={() => handleEdit(p)} title="Edit"><span role="img" aria-label="edit">✏️</span></button>
                       <button className="bg-white border px-2 py-1 rounded text-red-600" onClick={() => handleDelete(p.id)} title="Delete"><span role="img" aria-label="delete">🗑️</span></button>
                     </td>

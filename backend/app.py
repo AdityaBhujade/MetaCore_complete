@@ -586,7 +586,7 @@ def generate_report(patient_id):
         db_cursor.execute('''
             SELECT * FROM tests 
             WHERE patient_id = ? 
-            ORDER BY created_at DESC
+            ORDER BY test_category, test_subcategory, created_at DESC
         ''', (patient_id,))
         tests = db_cursor.fetchall()
         
@@ -596,8 +596,8 @@ def generate_report(patient_id):
         test_list = []
         for test in tests:
             # Calculate status
-            value = test[4]
-            ref_range = str(test[5])
+            value = test[5]
+            ref_range = str(test[6])
             status = 'Normal'
             # parse reference range (e.g., '32–36', 'M: 13–16; F: 11.5–14.5', '<1.1', 'Up to 60')
             ref = ref_range.replace('–', '-').replace(' ', '')
@@ -626,11 +626,12 @@ def generate_report(patient_id):
             test_list.append({
                 'id': test[0],
                 'testCategory': test[2],
-                'testName': test[3],
+                'testSubcategory': test[3],  # Add subcategory
+                'testName': test[4],
                 'testValue': value,
-                'normalRange': test[5],
-                'unit': test[6],
-                'additionalNote': test[7],
+                'normalRange': test[6],
+                'unit': test[7],
+                'additionalNote': test[9],
                 'createdAt': test[8],
                 'status': status
             })

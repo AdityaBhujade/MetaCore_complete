@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { patientService, testService } from '../services/api';
+import { useNavigate } from 'react-router-dom';
 
 const AddTestResults = ({ onTestAdded }) => {
   const [tests, setTests] = useState([
@@ -16,6 +17,7 @@ const AddTestResults = ({ onTestAdded }) => {
   const [loadingTests, setLoadingTests] = useState(true);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -26,6 +28,14 @@ const AddTestResults = ({ onTestAdded }) => {
         const patientsRes = await patientService.getAll();
         if (patientsRes.success) {
           setPatients(patientsRes.data);
+          // Check for pre-selected patient
+          const selectedPatient = localStorage.getItem('selectedPatient');
+          if (selectedPatient) {
+            const patient = JSON.parse(selectedPatient);
+            setPatientId(patient.id);
+            // Clear the stored patient
+            localStorage.removeItem('selectedPatient');
+          }
         } else {
           setError('Failed to load patients');
         }
@@ -119,6 +129,57 @@ const AddTestResults = ({ onTestAdded }) => {
         setTestDate(new Date().toISOString().split('T')[0]);
         setNotes('');
         if (onTestAdded) onTestAdded();
+      } else {
+        setError(response.error || 'Failed to add test results');
+      }
+    } catch (e) {
+      setError('Failed to add test results');
+    }
+  };
+
+  const handleSaveAndGenerateReport = async (e) => {
+    e.preventDefault();
+    setError('');
+    setMessage('');
+
+    // Check if any test values are entered
+    const hasTestValues = tests.some(test => test.value.trim() !== '');
+    if (!hasTestValues) {
+      // If no test values, just redirect to reports
+      const selectedPatient = patients.find(p => p.id === patientId);
+      if (selectedPatient) {
+        localStorage.setItem('selectedPatient', JSON.stringify(selectedPatient));
+      }
+      navigate('/reports');
+      return;
+    }
+
+    try {
+      const testResults = tests.map(test => ({
+        testName: test.testName,
+        value: test.value,
+        normalRange: test.normalRange,
+        unit: test.unit
+      }));
+
+      const response = await testService.addResults({
+        patientId,
+        category: tests[0].category,
+        subcategory: tests[0].subcategory,
+        tests: testResults,
+        testDate,
+        notes
+      });
+
+      if (response.success) {
+        setMessage('Test results added successfully!');
+        // Store the selected patient in localStorage for Reports page
+        const selectedPatient = patients.find(p => p.id === patientId);
+        if (selectedPatient) {
+          localStorage.setItem('selectedPatient', JSON.stringify(selectedPatient));
+        }
+        // Navigate to reports page
+        navigate('/reports');
       } else {
         setError(response.error || 'Failed to add test results');
       }
@@ -358,6 +419,13 @@ const AddTestResults = ({ onTestAdded }) => {
             className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
           >
             Add Test Results
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveAndGenerateReport}
+            className="ml-4 bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700"
+          >
+            Save and Generate Report
           </button>
           <button
             type="button"

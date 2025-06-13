@@ -20,6 +20,19 @@ const Reports = () => {
         fetchPatients();
     }, []);
 
+    useEffect(() => {
+        // Check for pre-selected patient
+        const selectedPatient = localStorage.getItem('selectedPatient');
+        if (selectedPatient) {
+            const patient = JSON.parse(selectedPatient);
+            setSelectedPatient(patient);
+            // Clear the stored patient
+            localStorage.removeItem('selectedPatient');
+            // Automatically generate report
+            generateReport();
+        }
+    }, [patients]); // Run when patients are loaded
+
     const fetchLabInfo = async () => {
         try {
             const response = await labService.getInfo();
@@ -329,12 +342,17 @@ const Reports = () => {
         }, 500);
     };
 
-    // Helper: group tests by category
+    // Helper: group tests by category and subcategory
     const groupTestsByCategory = (tests) => {
         const grouped = {};
         tests.forEach(test => {
-            if (!grouped[test.testCategory]) grouped[test.testCategory] = [];
-            grouped[test.testCategory].push(test);
+            if (!grouped[test.testCategory]) {
+                grouped[test.testCategory] = {};
+            }
+            if (!grouped[test.testCategory][test.testSubcategory]) {
+                grouped[test.testCategory][test.testSubcategory] = [];
+            }
+            grouped[test.testCategory][test.testSubcategory].push(test);
         });
         return grouped;
     };
@@ -547,9 +565,6 @@ const Reports = () => {
                                     <div className="flex items-center gap-2"><span className="material-icons text-base">email</span>{labInfo.email}</div>
                                 </div>
                             </div>
-                            <div className="bg-blue-50 rounded-lg px-4 py-2 text-xs text-blue-900 font-semibold text-right shadow-sm">
-                                NABL Accredited<br />ISO 15189:2012<br />CAP Certified
-                            </div>
                         </div>
                         <hr className="my-4 border-blue-200" />
                         <div className="text-center mb-4">
@@ -572,45 +587,50 @@ const Reports = () => {
                                     <div className="mb-1"><span className="font-medium">Report Date:</span> {reportDate}</div>
                                     <div className="mb-1"><span className="font-medium">Report Time:</span> {reportTime}</div>
                                     <div className="mb-1"><span className="font-medium">REF. BY:</span> {report.refBy || '-'}</div>
-                                    <div className="mb-1"><span className="font-medium">Lab Ref No:</span> {report.labRefNo || '-'}</div>
                                 </div>
                             </div>
                         </div>
+
                         {/* Grouped test tables */}
-                        {Object.entries(groupTestsByCategory(report.tests)).map(([category, tests]) => (
+                        {Object.entries(groupTestsByCategory(report.tests)).map(([category, subcategories]) => (
                             <div key={category} style={{ marginBottom: 32 }}>
                                 <div style={{ background: '#eaf2fb', padding: 8, fontWeight: 'bold', fontSize: 16, marginBottom: 0, borderLeft: '4px solid #1976d2' }}>{category.toUpperCase()}</div>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16 }}>
-                                    <thead>
-                                        <tr style={{ background: '#f7f7f7' }}>
-                                            <th style={{ border: '1px solid #ccc', padding: 8 }}>TEST NAME</th>
-                                            <th style={{ border: '1px solid #ccc', padding: 8 }}>RESULT</th>
-                                            <th style={{ border: '1px solid #ccc', padding: 8 }}>UNIT</th>
-                                            <th style={{ border: '1px solid #ccc', padding: 8 }}>REFERENCE RANGE</th>
-                                            <th style={{ border: '1px solid #ccc', padding: 8 }}>STATUS</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {tests.map((test, idx) => {
-                                            const status = getStatus(test);
-                                            let color = '#388e3c';
-                                            if (status === 'Low' || status === 'High' || status === 'Positive') color = '#d32f2f';
-                                            if (status === 'Negative' || status === 'Normal') color = '#388e3c';
-                                            let arrow = '';
-                                            if (status === 'Low') arrow = '↓';
-                                            if (status === 'High') arrow = '↑';
-                                            return (
-                                                <tr key={test.id || idx}>
-                                                    <td style={{ border: '1px solid #ccc', padding: 8 }}>{test.testName}</td>
-                                                    <td style={{ border: '1px solid #ccc', padding: 8, color }}>{test.testValue} {arrow}</td>
-                                                    <td style={{ border: '1px solid #ccc', padding: 8 }}>{test.unit}</td>
-                                                    <td style={{ border: '1px solid #ccc', padding: 8 }}>{test.normalRange}</td>
-                                                    <td style={{ border: '1px solid #ccc', padding: 8, color, fontWeight: 'bold' }}>{status}</td>
+                                {Object.entries(subcategories).map(([subcategory, tests]) => (
+                                    <div key={subcategory} style={{ marginBottom: 16 }}>
+                                        <div style={{ background: '#f5f5f5', padding: 6, fontWeight: 'bold', fontSize: 14, marginBottom: 0, borderLeft: '4px solid #90caf9' }}>{subcategory}</div>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16 }}>
+                                            <thead>
+                                                <tr style={{ background: '#f7f7f7' }}>
+                                                    <th style={{ border: '1px solid #ccc', padding: 8, textAlign: 'left', width: '30%' }}>TEST NAME</th>
+                                                    <th style={{ border: '1px solid #ccc', padding: 8, textAlign: 'left', width: '20%' }}>RESULT</th>
+                                                    <th style={{ border: '1px solid #ccc', padding: 8, textAlign: 'left', width: '10%' }}>UNIT</th>
+                                                    <th style={{ border: '1px solid #ccc', padding: 8, textAlign: 'left', width: '25%' }}>REFERENCE RANGE</th>
+                                                    <th style={{ border: '1px solid #ccc', padding: 8, textAlign: 'left', width: '15%' }}>STATUS</th>
                                                 </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                                            </thead>
+                                            <tbody>
+                                                {tests.map((test, idx) => {
+                                                    const status = getStatus(test);
+                                                    let color = '#388e3c';
+                                                    if (status === 'Low' || status === 'High' || status === 'Positive') color = '#d32f2f';
+                                                    if (status === 'Negative' || status === 'Normal') color = '#388e3c';
+                                                    let arrow = '';
+                                                    if (status === 'Low') arrow = '↓';
+                                                    if (status === 'High') arrow = '↑';
+                                                    return (
+                                                        <tr key={test.id || idx}>
+                                                            <td style={{ border: '1px solid #ccc', padding: 8, textAlign: 'left' }}>{test.testName}</td>
+                                                            <td style={{ border: '1px solid #ccc', padding: 8, textAlign: 'left', color }}>{test.testValue} {arrow}</td>
+                                                            <td style={{ border: '1px solid #ccc', padding: 8, textAlign: 'left' }}>{test.unit}</td>
+                                                            <td style={{ border: '1px solid #ccc', padding: 8, textAlign: 'left' }}>{test.normalRange}</td>
+                                                            <td style={{ border: '1px solid #ccc', padding: 8, textAlign: 'left', color, fontWeight: 'bold' }}>{status}</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ))}
                             </div>
                         ))}
                         <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
@@ -621,8 +641,8 @@ const Reports = () => {
                                 <li>Please correlate with clinical findings and consult your physician for interpretation</li>
                             </ul>
                         </div>
-                        <div className="flex justify-between items-center text-xs text-gray-600 mt-8">
-                            <div>
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-end text-xs text-gray-600 mt-8">
+                            <div className="mb-4 md:mb-0">
                                 <div>Lab Director: </div>
                                 <div>Pathologist & Laboratory Director</div>
                             </div>
@@ -642,4 +662,4 @@ const Reports = () => {
     );
 };
 
-export default Reports; 
+export default Reports;
