@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { patientService, labService, reportService } from '../services/api';
+import { QRCodeSVG } from 'qrcode.react';
+import companyLogo from '../assets/company.png';
+import azazKhanSignature from '../assets/azaz khan.png';
 
 const Reports = () => {
     const [labInfo, setLabInfo] = useState(null);
@@ -21,17 +24,15 @@ const Reports = () => {
     }, []);
 
     useEffect(() => {
-        // Check for pre-selected patient
         const selectedPatient = localStorage.getItem('selectedPatient');
         if (selectedPatient) {
             const patient = JSON.parse(selectedPatient);
             setSelectedPatient(patient);
-            // Clear the stored patient
             localStorage.removeItem('selectedPatient');
-            // Automatically generate report
             generateReport();
         }
-    }, [patients]); // Run when patients are loaded
+        // eslint-disable-next-line
+    }, [patients]);
 
     const fetchLabInfo = async () => {
         try {
@@ -56,28 +57,24 @@ const Reports = () => {
                 throw new Error('Failed to fetch patients');
             }
         } catch (err) {
-            // console.error('Error fetching patients:', err);
             setError('Failed to load patients');
         } finally {
             setLoading(false);
         }
     };
 
-    // Filter patients based on search query
     const filteredPatients = patients.filter(patient => {
         const searchLower = searchQuery.toLowerCase();
-        return patient.fullName.toLowerCase().includes(searchLower) || 
-               patient.patientCode.toLowerCase().includes(searchLower);
+        return patient.fullName.toLowerCase().includes(searchLower) ||
+            patient.patientCode.toLowerCase().includes(searchLower);
     });
 
-    // Handle patient selection
     const handlePatientSelect = (patient) => {
         setSelectedPatient(patient);
         setSearchQuery(patient.fullName);
         setShowDropdown(false);
     };
 
-    // Handle search input change
     const handleSearchChange = (e) => {
         setSearchQuery(e.target.value);
         setShowDropdown(true);
@@ -86,14 +83,12 @@ const Reports = () => {
         }
     };
 
-    // Handle click outside to close dropdown
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (!event.target.closest('.search-container')) {
                 setShowDropdown(false);
             }
         };
-
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
@@ -113,7 +108,6 @@ const Reports = () => {
                 throw new Error('Failed to generate report');
             }
         } catch (err) {
-            // console.error('Error generating report:', err);
             setError('Failed to generate report');
         } finally {
             setLoading(false);
@@ -133,148 +127,28 @@ const Reports = () => {
         window.open(whatsappUrl, '_blank');
     };
 
-    // Helper for age/sex string
     const getAgeSex = (age, gender) => `${age} Years / ${gender}`;
-    // Helper for date/time
     const now = new Date();
     const reportDate = now.toLocaleDateString();
     const reportTime = now.toLocaleTimeString();
 
     const handleDownloadPDF = async () => {
         if (!reportRef.current) return;
-
         try {
             const element = reportRef.current;
             const canvas = await html2canvas(element, {
                 scale: 2,
                 useCORS: true,
                 logging: false,
-                backgroundColor: '#ffffff',
+                backgroundColor: '#eaf2fb',
                 windowWidth: 800,
-                onclone: (clonedDoc) => {
-                    const clonedElement = clonedDoc.querySelector('[data-report]');
-                    if (clonedElement) {
-                        // Base styles for the container
-                        clonedElement.style.backgroundColor = '#ffffff';
-                        clonedElement.style.color = '#1f2937';
-                        clonedElement.style.fontFamily = 'Arial, sans-serif';
-                        clonedElement.style.padding = '32px';
-                        clonedElement.style.margin = '0 auto';
-                        clonedElement.style.width = '800px';
-                        clonedElement.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
-                        clonedElement.style.borderRadius = '8px';
-
-                        // Override all computed styles to replace oklch colors
-                        const allElements = clonedElement.querySelectorAll('*');
-                        allElements.forEach(el => {
-                            const style = window.getComputedStyle(el);
-
-                            // Override background colors
-                            if (style.backgroundColor.includes('oklch')) {
-                                el.style.backgroundColor = '#ffffff';
-                            }
-
-                            // Override text colors
-                            if (style.color.includes('oklch')) {
-                                el.style.color = '#1f2937';
-                            }
-
-                            // Override border colors
-                            if (style.borderColor.includes('oklch')) {
-                                el.style.borderColor = '#e5e7eb';
-                            }
-
-                            // Override any other color properties
-                            ['color', 'backgroundColor', 'borderColor', 'borderTopColor',
-                                'borderRightColor', 'borderBottomColor', 'borderLeftColor'].forEach(prop => {
-                                    if (el.style[prop]?.includes('oklch')) {
-                                        el.style.borderColor = '#e5e7eb';
-                                    }
-                                });
-                        });
-
-                        // Style the header section
-                        const header = clonedElement.querySelector('.flex.justify-between');
-                        if (header) {
-                            header.style.borderBottom = '2px solid #e5e7eb';
-                            header.style.paddingBottom = '16px';
-                            header.style.marginBottom = '24px';
-                        }
-
-                        // Style the patient info section
-                        const patientInfo = clonedElement.querySelector('.space-y-1');
-                        if (patientInfo) {
-                            patientInfo.style.marginBottom = '24px';
-                        }
-
-                        // Style the table
-                        const table = clonedElement.querySelector('table');
-                        if (table) {
-                            table.style.width = '100%';
-                            table.style.borderCollapse = 'collapse';
-                            table.style.marginTop = '24px';
-                            table.style.marginBottom = '24px';
-                        }
-
-                        // Style table headers
-                        const thElements = clonedElement.querySelectorAll('th');
-                        thElements.forEach(th => {
-                            th.style.backgroundColor = '#f3f4f6';
-                            th.style.padding = '12px';
-                            th.style.textAlign = 'left';
-                            th.style.fontWeight = '600';
-                            th.style.borderBottom = '2px solid #e5e7eb';
-                        });
-
-                        // Style table cells
-                        const tdElements = clonedElement.querySelectorAll('td');
-                        tdElements.forEach(td => {
-                            td.style.padding = '12px';
-                            td.style.borderBottom = '1px solid #e5e7eb';
-                        });
-
-                        // Style status indicators
-                        const statusElements = clonedElement.querySelectorAll('[class*="status-"]');
-                        statusElements.forEach(el => {
-                            if (el.classList.contains('status-low')) {
-                                el.style.color = '#059669';
-                                el.style.backgroundColor = '#ecfdf5';
-                                el.style.padding = '4px 8px';
-                                el.style.borderRadius = '4px';
-                                el.style.fontWeight = '500';
-                            } else if (el.classList.contains('status-normal')) {
-                                el.style.color = '#2563eb';
-                                el.style.backgroundColor = '#eff6ff';
-                                el.style.padding = '4px 8px';
-                                el.style.borderRadius = '4px';
-                                el.style.fontWeight = '500';
-                            } else if (el.classList.contains('status-high')) {
-                                el.style.color = '#dc2626';
-                                el.style.backgroundColor = '#fef2f2';
-                                el.style.padding = '4px 8px';
-                                el.style.borderRadius = '4px';
-                                el.style.fontWeight = '500';
-                            }
-                        });
-
-                        // Style the footer
-                        const footer = clonedElement.querySelector('.mt-8');
-                        if (footer) {
-                            footer.style.marginTop = '32px';
-                            footer.style.paddingTop = '16px';
-                            footer.style.borderTop = '2px solid #e5e7eb';
-                        }
-                    }
-                }
             });
-
             const imgData = canvas.toDataURL('image/png');
             const pdf = new jsPDF({
                 orientation: 'portrait',
                 unit: 'mm',
                 format: 'a4'
             });
-
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = pdf.internal.pageSize.getHeight();
             const imgWidth = canvas.width;
@@ -282,21 +156,17 @@ const Reports = () => {
             const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
             const imgX = (pdfWidth - imgWidth * ratio) / 2;
             const imgY = 10;
-
             pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
             pdf.save('lab_report.pdf');
         } catch (error) {
-            // console.error('Error generating PDF:', error);
             setError('Failed to generate PDF');
         }
     };
 
     const handlePrint = () => {
         if (!reportRef.current) return;
-
         const printContents = reportRef.current.innerHTML;
         const printWindow = window.open('', '', 'height=900,width=800');
-        
         printWindow.document.write(`
           <html>
             <head>
@@ -305,7 +175,7 @@ const Reports = () => {
                 body { 
                   margin: 0;
                   padding: 0;
-                  background: #fff;
+                  background: #eaf2fb;
                   color: #222;
                   font-family: Arial, sans-serif;
                 }
@@ -314,6 +184,7 @@ const Reports = () => {
                   margin: 0 auto;
                   padding: 24px;
                   box-sizing: border-box;
+                  background: #eaf2fb;
                 }
                 @media print {
                   body { margin: 0; }
@@ -331,18 +202,14 @@ const Reports = () => {
             </body>
           </html>
         `);
-
         printWindow.document.close();
         printWindow.focus();
-        
-        // Wait for images to load
         setTimeout(() => {
-          printWindow.print();
-          printWindow.close();
+            printWindow.print();
+            printWindow.close();
         }, 500);
     };
 
-    // Helper: group tests by category and subcategory
     const groupTestsByCategory = (tests) => {
         const grouped = {};
         tests.forEach(test => {
@@ -357,18 +224,14 @@ const Reports = () => {
         return grouped;
     };
 
-    // Helper: status logic
     const getStatus = (test) => {
         const value = test.testValue;
         const ref = String(test.normalRange || '').trim();
-        // Handle Positive/Negative
         if (/negative|positive/i.test(ref)) {
             if (String(value).toLowerCase() === 'negative') return 'Negative';
             if (String(value).toLowerCase() === 'positive') return 'Positive';
-            // fallback
             return String(value);
         }
-        // Numeric range logic
         const range = ref.replace('–', '-').replace(/ /g, '');
         const match = range.match(/^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$/);
         if (match) {
@@ -381,7 +244,6 @@ const Reports = () => {
                 return 'Normal';
             }
         }
-        // < or > logic
         if (range.startsWith('<')) {
             const high = parseFloat(range.slice(1));
             const num = parseFloat(value);
@@ -398,7 +260,6 @@ const Reports = () => {
                 return 'Normal';
             }
         }
-        // fallback
         return 'Normal';
     };
 
@@ -408,20 +269,19 @@ const Reports = () => {
                 <h1 className="text-3xl font-bold text-gray-800">Reports</h1>
                 <p className="text-gray-600 mt-2">Generate and view patient reports</p>
             </div>
-
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">Generate Report</h2>
                 <div className="space-y-4">
                     <div className="mb-6">
                         <label className="block text-gray-700 font-semibold mb-1">Search Patient</label>
                         <div className="patient-dropdown relative">
-                            <div 
+                            <div
                                 className="w-full border rounded px-3 py-2 flex items-center justify-between cursor-pointer bg-white"
                                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                             >
                                 <span>
-                                    {selectedPatient ? 
-                                        patients.find(p => p.id === selectedPatient.id)?.fullName || 'Select a patient' : 
+                                    {selectedPatient ?
+                                        patients.find(p => p.id === selectedPatient.id)?.fullName || 'Select a patient' :
                                         'Select a patient'
                                     }
                                 </span>
@@ -429,7 +289,6 @@ const Reports = () => {
                                     {isDropdownOpen ? 'expand_less' : 'expand_more'}
                                 </span>
                             </div>
-
                             {isDropdownOpen && (
                                 <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg">
                                     <div className="p-2">
@@ -467,7 +326,6 @@ const Reports = () => {
                             )}
                         </div>
                     </div>
-
                     {selectedPatient && (
                         <div className="mt-4 p-4 bg-gray-50 rounded-md">
                             <div className="grid grid-cols-2 gap-4">
@@ -490,16 +348,14 @@ const Reports = () => {
                             </div>
                         </div>
                     )}
-
                     <div className="flex justify-end mt-4">
                         <button
                             onClick={generateReport}
                             disabled={!selectedPatient || loading}
-                            className={`px-4 py-2 rounded-md text-white flex items-center ${
-                                !selectedPatient || loading
-                                    ? 'bg-gray-400 cursor-not-allowed'
-                                    : 'bg-blue-600 hover:bg-blue-700'
-                            }`}
+                            className={`px-4 py-2 rounded-md text-white flex items-center ${!selectedPatient || loading
+                                ? 'bg-gray-400 cursor-not-allowed'
+                                : 'bg-blue-600 hover:bg-blue-700'
+                                }`}
                         >
                             {loading ? (
                                 <>
@@ -516,10 +372,9 @@ const Reports = () => {
                     </div>
                 </div>
             </div>
-
             {/* Report Display Section */}
             {report && labInfo && (
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 max-w-4xl mx-auto">
+                <div className="rounded-lg shadow-sm border border-gray-200 p-8 max-w-4xl mx-auto" style={{ background: '#eaf2fb' }}>
                     <div className="flex justify-end mb-4 gap-2">
                         <button
                             onClick={handlePrint}
@@ -544,17 +399,18 @@ const Reports = () => {
                         ref={reportRef}
                         data-report
                         style={{
-                            background: '#ffffff',
+                            background: '#eaf2fb',
                             color: '#222222',
                             width: '800px',
                             fontFamily: 'Arial, sans-serif',
                             margin: '0 auto',
                             padding: '24px',
                             boxShadow: '0 0 10px rgba(0,0,0,0.1)',
-                            borderRadius: '8px'
+                            borderRadius: '8px',
+                            position: 'relative'
                         }}
                     >
-                        {/* Header */}
+                        {/* Header with logo */}
                         <div className="flex justify-between items-start mb-2">
                             <div>
                                 <h1 className="text-2xl font-bold text-blue-900 uppercase">{labInfo.name}</h1>
@@ -565,6 +421,7 @@ const Reports = () => {
                                     <div className="flex items-center gap-2"><span className="material-icons text-base">email</span>{labInfo.email}</div>
                                 </div>
                             </div>
+                            <img src={companyLogo} alt="Logo" style={{ height: 80, marginLeft: 32, borderRadius: 8 }} />
                         </div>
                         <hr className="my-4 border-blue-200" />
                         <div className="text-center mb-4">
@@ -590,7 +447,6 @@ const Reports = () => {
                                 </div>
                             </div>
                         </div>
-
                         {/* Grouped test tables */}
                         {Object.entries(groupTestsByCategory(report.tests)).map(([category, subcategories]) => (
                             <div key={category} style={{ marginBottom: 32 }}>
@@ -641,14 +497,52 @@ const Reports = () => {
                                 <li>Please correlate with clinical findings and consult your physician for interpretation</li>
                             </ul>
                         </div>
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-end text-xs text-gray-600 mt-8">
-                            <div className="mb-4 md:mb-0">
-                                <div>Lab Director: </div>
-                                <div>Pathologist & Laboratory Director</div>
+
+                        {/* QR & Signature Section */}
+                        <div
+                            style={{
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr',
+                                alignItems: 'flex-end',
+                                marginTop: 32,
+                                background: '#eaf2fb',
+                                minHeight: 140,
+                                gap: 8,
+                            }}
+                        >
+                            {/* QR code and label */}
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginLeft: 32 }}>
+                                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>Scan to view online:</div>
+                                <QRCodeSVG value={generateShareableLink(selectedPatient.patientCode)} size={120} />
                             </div>
-                            <div className="text-right">
-                                <div>This is a computer generated report</div>
-                                <div>Report generated on: {reportDate}, {reportTime}</div>
+                            {/* Signature and doctor info */}
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginRight: 32 }}>
+                                <img src={azazKhanSignature} alt="Signature" style={{ height: 40, margin: '0 0 4px 0' }} />
+                                <div style={{ fontWeight: 700, fontSize: 14, marginTop: 4 }}>DR. AJAZ KHAN<br /><span style={{ fontWeight: 400 }}>MD, (MBBS)</span></div>
+                                <div style={{ fontSize: 12, color: '#888',marginRight:-18 }}>CONSULTANT PATHOLOGIST</div>
+                            </div>
+                        </div>
+
+                        {/* Lab Director & Computer Generated Report Section */}
+                        <div
+                            style={{
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr',
+                                alignItems: 'center',
+                                marginTop: 24,
+                                background: '#eaf2fb',
+                                fontSize: 13,
+                                color: '#555',
+                                minHeight: 40,
+                                gap: 8,
+                            }}
+                        >
+                            <div style={{ textAlign: 'left', fontWeight: 700,fontSize: 14 }}>
+                                Lab Director: Md Sajid Husain
+                            </div>
+                            <div style={{ textAlign: 'right', fontSize: 12,fontWeight: 400 }}>
+                                This is a computer generated report<br />
+                                Report generated on: {reportDate}, {reportTime}
                             </div>
                         </div>
                         <div className="bg-gray-100 text-xs text-gray-700 p-4 rounded mt-6">
