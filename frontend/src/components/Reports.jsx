@@ -56,8 +56,8 @@ const Reports = () => {
                 throw new Error('Failed to fetch patients');
             }
         } catch (err) {
-            setError('Error loading patients. Please try again later.');
-            console.error('Error fetching patients:', err);
+            // console.error('Error fetching patients:', err);
+            setError('Failed to load patients');
         } finally {
             setLoading(false);
         }
@@ -113,8 +113,8 @@ const Reports = () => {
                 throw new Error('Failed to generate report');
             }
         } catch (err) {
-            setError('Error generating report. Please try again later.');
-            console.error('Error generating report:', err);
+            // console.error('Error generating report:', err);
+            setError('Failed to generate report');
         } finally {
             setLoading(false);
         }
@@ -286,8 +286,8 @@ const Reports = () => {
             pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
             pdf.save('lab_report.pdf');
         } catch (error) {
-            console.error('Error generating PDF:', error);
-            alert('Failed to generate PDF. Please try again.');
+            // console.error('Error generating PDF:', error);
+            setError('Failed to generate PDF');
         }
     };
 

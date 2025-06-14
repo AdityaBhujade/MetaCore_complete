@@ -4,7 +4,7 @@ import { useAuth } from '../AuthContext';
 
 const Sidebar = () => {
   return (
-    <div className="h-screen w-64 bg-white border-r border-gray-200 fixed left-0 top-0 flex flex-col">
+    <div className="h-screen w-64 bg-gray-50 border-r border-gray-200 fixed left-0 top-0 flex flex-col">
       <div className="p-6">
         <div className="flex items-center mb-8">
           <img src="/logo.svg" alt="MetaCore Logo" className="w-10 h-10 mr-3" />

@@ -29,7 +29,7 @@ const AddTestResults = ({ onTestAdded }) => {
         if (dateRes.success) {
           setTestDate(dateRes.data.date);
         } else {
-          console.error('Failed to fetch current date:', dateRes.error);
+          // console.error('Failed to fetch current date:', dateRes.error);
           // Fallback to local date if backend fails
           setTestDate(new Date().toISOString().split('T')[0]);
         }
@@ -55,11 +55,11 @@ const AddTestResults = ({ onTestAdded }) => {
         if (testsRes.success) {
           setAvailableTests(testsRes.data);
         } else {
-          console.error('Failed to fetch tests:', testsRes.error);
+          // console.error('Failed to fetch tests:', testsRes.error);
           setError('Failed to load test data. Please try again later.');
         }
       } catch (e) {
-        console.error('Error fetching data:', e);
+        // console.error('Error fetching data:', e);
         setError('Failed to connect to server. Please check your connection.');
         setPatients([]);
         setAvailableTests([]);
@@ -478,10 +478,10 @@ const TestHistory = ({ refreshFlag }) => {
         if (!testsRes.success) {
           throw new Error('Failed to fetch tests');
         }
-        console.log('Fetched tests:', testsRes.data); // Debug log
+        // console.log('Fetched tests:', testsRes.data); // Debug log
         setTests(testsRes.data || []);
       } catch (err) {
-        console.error('Error fetching data:', err);
+        // console.error('Error fetching data:', err);
         setError('Failed to load test history');
         setTests([]);
       }

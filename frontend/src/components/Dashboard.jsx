@@ -109,8 +109,8 @@ const Dashboard = () => {
                 setRecentActivity(activities.slice(0, 5));
 
             } catch (error) {
-                console.error('Error fetching dashboard stats:', error);
-                setError('Failed to load dashboard data. Please try again later.');
+                // console.error('Error fetching dashboard stats:', error);
+                setError('Failed to load dashboard data');
             }
         };
 

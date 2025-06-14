@@ -46,7 +46,7 @@ const AddEditPatient = ({ onPatientAdded, onCancel, editPatient }) => {
         setFormData(prev => ({ ...prev, patientCode: '' }));
       }
     } catch (e) {
-      console.error('Failed to fetch latest patient code:', e);
+      // console.error('Failed to fetch latest patient code:', e);
       setError('Failed to fetch latest patient code');
       setFormData(prev => ({ ...prev, patientCode: '' }));
     }
@@ -58,10 +58,11 @@ const AddEditPatient = ({ onPatientAdded, onCancel, editPatient }) => {
       if (response.success) {
         setRefDoctors(response.data);
       } else {
+        // console.error('Failed to fetch reference doctors:', e);
         setError('Failed to fetch reference doctors');
       }
     } catch (e) {
-      console.error('Failed to fetch reference doctors:', e);
+      // console.error('Failed to fetch reference doctors:', e);
       setError('Failed to fetch reference doctors');
     }
     setLoading(false);
@@ -119,6 +120,7 @@ const AddEditPatient = ({ onPatientAdded, onCancel, editPatient }) => {
         setError(response.error || 'Failed to save patient');
       }
     } catch (err) {
+      // console.error('Failed to connect to server');
       setError('Failed to connect to server');
     }
   };
@@ -282,6 +284,7 @@ const PatientList = ({ refreshFlag }) => {
   const [editFormData, setEditFormData] = useState({});
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     fetchPatients();
@@ -293,14 +296,23 @@ const PatientList = ({ refreshFlag }) => {
       if (response.success) {
         setPatients(response.data);
       } else {
-        console.error('Failed to fetch patients:', response.error);
+        // console.error('Failed to fetch patients:', response.error);
+        setError('Failed to fetch patients');
       }
     } catch (err) {
-      console.error('Error fetching patients:', err);
+      // console.error('Error fetching patients:', err);
+      setError('Failed to connect to server');
     } finally {
       setLoading(false);
     }
   };
+
+  // Filter patients by search
+  const filteredPatients = patients.filter(patient => 
+    patient.fullName.toLowerCase().includes(search.toLowerCase()) ||
+    patient.patientCode.toLowerCase().includes(search.toLowerCase()) ||
+    patient.contactNumber.includes(search)
+  );
 
   const handleEdit = (p) => {
     setEditingPatient(p.id);
@@ -326,10 +338,12 @@ const PatientList = ({ refreshFlag }) => {
         setEditingPatient(null);
         fetchPatients();
       } else {
-        console.error('Failed to update patient:', response.error);
+        // console.error('Failed to update patient:', response.error);
+        setError('Failed to update patient');
       }
     } catch (err) {
-      console.error('Error updating patient:', err);
+      // console.error('Error updating patient:', err);
+      setError('Failed to connect to server');
     }
   };
 
@@ -340,10 +354,12 @@ const PatientList = ({ refreshFlag }) => {
         if (response.success) {
           fetchPatients();
         } else {
-          console.error('Failed to delete patient:', response.error);
+          // console.error('Failed to delete patient:', response.error);
+          setError('Failed to delete patient');
         }
       } catch (err) {
-        console.error('Error deleting patient:', err);
+        // console.error('Error deleting patient:', err);
+        setError('Failed to connect to server');
       }
     }
   };
@@ -360,6 +376,13 @@ const PatientList = ({ refreshFlag }) => {
   return (
     <div className="mt-8">
       <h2 className="text-2xl font-bold mb-4">Patient List</h2>
+      <input
+        type="text"
+        className="mb-4 px-3 py-2 border rounded w-full max-w-md"
+        placeholder="Search by name, patient code, or contact number..."
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+      />
       <div className="overflow-x-auto">
         <table className="min-w-full border text-sm">
           <thead>
@@ -375,7 +398,7 @@ const PatientList = ({ refreshFlag }) => {
             </tr>
           </thead>
           <tbody>
-            {patients.map((p) => (
+            {filteredPatients.map((p) => (
               <tr key={p.id} className="even:bg-gray-50">
                 {editingPatient === p.id ? (
                   <>
@@ -409,7 +432,7 @@ const PatientList = ({ refreshFlag }) => {
                     <td className="px-4 py-2 border">{p.email}</td>
                     <td className="px-4 py-2 border"><span className="bg-gray-100 px-2 py-1 rounded text-xs">{p.refBy}</span></td>
                     <td className="px-4 py-2 border flex gap-2 items-center">
-                      <button 
+                      <button
                         onClick={() => handleQuickAddTest(p)}
                         className="bg-white border px-2 py-1 rounded text-blue-600" 
                         title="Quick Add Test"

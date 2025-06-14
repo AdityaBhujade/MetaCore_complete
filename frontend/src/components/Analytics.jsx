@@ -59,6 +59,7 @@ const Analytics = () => {
   });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('Demographics');
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -141,11 +142,11 @@ const Analytics = () => {
           }
 
           // Monthly trends and today/this week counts
-          if (test.createdAt) {
-            const testDate = new Date(test.createdAt);
+          if (test.test_date) {
+            const testDate = new Date(test.test_date);
             
             // Count today's tests
-            if (testDate >= startOfDay) {
+            if (testDate.toDateString() === startOfDay.toDateString()) {
               todayTests++;
             }
             
@@ -163,11 +164,11 @@ const Analytics = () => {
             }
 
             // Add test completion to recent activity
-            const patient = patients.find(p => p.id === test.patientId);
+            const patient = patients.find(p => p.id === test.patient_id);
             recentActivity.push({
               type: 'test',
               title: 'Test Completed',
-              description: `${test.testName} results are ready for ${patient ? patient.fullName : 'Unknown'}`,
+              description: `${test.test_name} results are ready for ${patient ? patient.fullName : 'Unknown'}`,
               time: testDate.toLocaleString(),
               icon: <span className="material-icons text-green-500">science</span>
             });
@@ -237,7 +238,8 @@ const Analytics = () => {
       });
 
     } catch (err) {
-      console.error('Error fetching analytics data:', err);
+      // console.error('Error fetching analytics data:', err);
+      setError('Failed to load analytics data');
     } finally {
       setLoading(false);
     }
