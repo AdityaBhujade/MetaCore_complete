@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import logo from '../assets/logo.svg';
+import logo from '../assets/logo1.png';
 import { useAuth } from '../AuthContext';
 
 const SignIn = () => {
@@ -41,11 +41,11 @@ const SignIn = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#f4f7fe]">
       <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md flex flex-col items-center">
-        <div className="bg-blue-100 rounded-full p-4 mb-4">
-          <img src={logo} alt="MetaCore Logo" className="w-16 h-16 mx-auto" />
+        <div className="text-center mb-8">
+          <img src={logo} alt="MetaCore Logo" className="w-32 h-32 mx-auto mb-4 object-contain" />
+          <h1 className="text-3xl font-bold text-gray-900">Welcome to MetaCore</h1>
+          <p className="text-gray-600 mt-2">Please sign in to continue</p>
         </div>
-        <h1 className="text-2xl font-bold mb-1">METACORE</h1>
-        <p className="text-gray-500 mb-6">Laboratory Management System</p>
         <form className="w-full" onSubmit={handleSubmit} noValidate>
           <label className="block text-gray-700 mb-1">Email</label>
           <input 
@@ -85,11 +85,11 @@ const SignIn = () => {
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
-        <div className="text-gray-400 text-sm mt-4 text-center">
+        {/* <div className="text-gray-400 text-sm mt-4 text-center">
           Admin credentials:<br/>
           Email: admin@metacore.com<br/>
           Password: metacore@admin123
-        </div>
+        </div> */}
       </div>
     </div>
   );

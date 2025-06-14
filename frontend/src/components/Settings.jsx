@@ -33,9 +33,9 @@ const SettingsDropdown = () => {
         className="fixed top-4 right-4 p-2 bg-white rounded-full shadow-md focus:outline-none border-2 border-blue-400 hover:bg-gray-100 transition-colors z-50 flex items-center"
       >
         <img 
-          src={user?.photoURL || "/logo.svg"} 
+          src={user?.photoURL || "/logo1.png"} 
           alt="Profile" 
-          className="w-8 h-8 rounded-full object-cover"
+          className="w-10 h-10 rounded-full object-cover"
         />
       </button>
 
@@ -44,9 +44,9 @@ const SettingsDropdown = () => {
           <div className="p-4 border-b border-gray-200">
             <div className="flex items-center space-x-3">
               <img
-                src={user?.photoURL || "/logo.svg"}
+                src={user?.photoURL || "/logo1.png"}
                 alt="User"
-                className="w-12 h-12 rounded-full border-2 border-blue-500 object-cover"
+                className="w-10 h-10 rounded-full border-2 border-blue-500 object-cover"
               />
               <div>
                 <p className="font-semibold text-gray-800">{user?.username || "MetaCore"}</p>
