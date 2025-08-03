@@ -1196,8 +1196,59 @@ def get_current_date():
         print(f"Error fetching current date: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+# @app.route('/api/reports/public/<patient_code>', methods=['GET'])
+# def public_generate_report(patient_code):
+#     try:
+#         conn = get_db_connection()
+#         db_cursor = conn.cursor()
+#         db_cursor.execute('SELECT * FROM patients WHERE patient_code = %s', (patient_code,))
+#         patient_row = db_cursor.fetchone()
+#         if not patient_row:
+#             return jsonify({'error': 'Patient not found'}), 404
+
+#         patient_columns = [desc[0] for desc in db_cursor.description]
+#         patient = dict(zip(patient_columns, patient_row))
+
+#         db_cursor.execute('''
+#             SELECT * FROM tests 
+#             WHERE patient_id = %s 
+#             ORDER BY test_category, test_subcategory, created_at DESC
+#         ''', (patient['id'],))
+#         tests_rows = db_cursor.fetchall()
+#         test_columns = [desc[0] for desc in db_cursor.description]
+#         test_list = []
+#         for test_row in tests_rows:
+#             test = dict(zip(test_columns, test_row))
+#             test_list.append({
+#                 'id': test['id'],
+#                 'testCategory': test['test_category'],
+#                 'testSubcategory': test['test_subcategory'],
+#                 'testName': test['test_name'],
+#                 'testValue': test['test_value'],
+#                 'normalRange': test['normal_range'],
+#                 'unit': test['unit'],
+#                 'additionalNote': test['additional_note'],
+#                 'createdAt': test['created_at'].strftime('%Y-%m-%d %H:%M:%S') if test['created_at'] else None,
+#             })
+
+#         report = {
+#             'patientName': patient['full_name'],
+#             'patientCode': patient['patient_code'],
+#             'patientAge': patient['age'],
+#             'patientGender': patient['gender'],
+#             'contactNumber': patient['contact_number'],
+#             'refBy': patient['ref_by'],
+#             'tests': test_list
+#         }
+#         conn.close()
+#         return jsonify(report)
+#     except Exception as e:
+#         print(f"Error generating public report: {str(e)}")
+#         return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     # Ensure database is initialized before starting the server
     init_db()
     init_user_table()
-    app.run(debug=True, port=5000) 
+    app.run(debug=True, port=5000)

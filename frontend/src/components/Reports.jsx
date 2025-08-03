@@ -34,6 +34,69 @@ const Reports = () => {
         // eslint-disable-next-line
     }, [patients]);
 
+    // Inject custom CSS for PDF/print
+    const injectCustomStyles = (container) => {
+        const style = document.createElement('style');
+        style.textContent = `
+            [data-report] {
+                background: #eaf2fb !important;
+                color: #222222 !important;
+                width: 800px !important;
+                font-family: Arial, sans-serif !important;
+                margin: 0 auto !important;
+                padding: 24px !important;
+                box-shadow: 0 0 10px rgba(0,0,0,0.1) !important;
+                border-radius: 8px !important;
+                border: none !important;
+                position: relative !important;
+            }
+            .grid {
+                background: white !important;
+                border-radius: 10px !important;
+                padding: 16px !important;
+                margin-bottom: 24px !important;
+                gap: 24px !important;
+            }
+            .interpretation-section {
+                background: #fffde7 !important;
+                border-left: 4px solid #ffe066 !important;
+                border-radius: 6px !important;
+                padding: 16px !important;
+                margin-bottom: 24px !important;
+            }
+            .interpretation-section h4 {
+                font-weight: bold !important;
+                color: #222 !important;
+                margin-bottom: 8px !important;
+                font-size: 20px !important;
+            }
+            .interpretation-section ul {
+                margin: 0 !important;
+                padding-left: 20px !important;
+                font-size: 15px !important;
+                color: #444 !important;
+            }
+            .grid > div {
+                background: transparent !important;
+                border: none !important;
+                border-radius: 8px !important;
+                padding: 16px !important;
+                box-shadow: none !important;
+                margin-bottom: 0px !important;
+            }
+            h2 {
+                text-align: center !important;
+                display: block !important;
+                margin: 0 auto !important;
+                font-weight: bold !important;
+                font-size: 22px !important;
+                color: #222 !important;
+            }
+            /* Add more rules as needed */
+        `;
+        container.prepend(style);
+    };
+
     const fetchLabInfo = async () => {
         try {
             const response = await labService.getInfo();
@@ -134,21 +197,63 @@ const Reports = () => {
 
     const handleDownloadPDF = async () => {
         if (!reportRef.current) return;
+
+        // Wait for all images inside reportRef to load
+        const images = reportRef.current.querySelectorAll('img');
+        await Promise.all(Array.from(images).map(img => {
+            if (img.complete) return Promise.resolve();
+            return new Promise(resolve => {
+                img.onload = img.onerror = resolve;
+            });
+        }));
+
         try {
-            const element = reportRef.current;
-            const canvas = await html2canvas(element, {
+            // Clone the report node
+            const clone = reportRef.current.cloneNode(true);
+
+            // Remove Tailwind color classes if needed
+            const colorClassRegex = /^(bg|text|border|from|to|via|ring|fill|stroke|placeholder|accent|outline|shadow|divide|decoration|selection)-/;
+            const removeColorClasses = (el) => {
+                if (el.classList && el.classList.length) {
+                    Array.from(el.classList).forEach(cls => {
+                        if (colorClassRegex.test(cls)) {
+                            el.classList.remove(cls);
+                        }
+                    });
+                }
+                Array.from(el.children).forEach(removeColorClasses);
+            };
+            removeColorClasses(clone);
+
+            // Inject custom styles
+            injectCustomStyles(clone);
+
+            // Force blue background on clone
+            clone.style.background = '#eaf2fb';
+            clone.style.backgroundColor = '#eaf2fb';
+
+            // Temporarily add to DOM for html2canvas
+            clone.style.position = 'absolute';
+            clone.style.left = '-9999px';
+            document.body.appendChild(clone);
+
+            const canvas = await html2canvas(clone, {
                 scale: 2,
                 useCORS: true,
                 logging: false,
                 backgroundColor: '#eaf2fb',
                 windowWidth: 800,
             });
+
+            document.body.removeChild(clone);
+
             const imgData = canvas.toDataURL('image/png');
             const pdf = new jsPDF({
                 orientation: 'portrait',
                 unit: 'mm',
                 format: 'a4'
             });
+
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = pdf.internal.pageSize.getHeight();
             const imgWidth = canvas.width;
@@ -156,59 +261,123 @@ const Reports = () => {
             const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
             const imgX = (pdfWidth - imgWidth * ratio) / 2;
             const imgY = 10;
+
             pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
             pdf.save('lab_report.pdf');
         } catch (error) {
-            setError('Failed to generate PDF');
+            console.error('Error generating PDF:', error);
+            alert('Failed to generate PDF. Please try again.');
         }
     };
 
     const handlePrint = () => {
         if (!reportRef.current) return;
+
         const printContents = reportRef.current.innerHTML;
         const printWindow = window.open('', '', 'height=900,width=800');
+
         printWindow.document.write(`
-          <html>
-            <head>
-              <title>Print Report</title>
-              <style>
-                body { 
-                  margin: 0;
-                  padding: 0;
-                  background: #eaf2fb;
-                  color: #222;
-                  font-family: Arial, sans-serif;
-                }
-                .report-content {
-                  width: 800px;
-                  margin: 0 auto;
-                  padding: 24px;
-                  box-sizing: border-box;
-                  background: #eaf2fb;
-                }
-                @media print {
-                  body { margin: 0; }
-                  .report-content { 
-                    width: 100%;
-                    padding: 0;
-                  }
-                }
-              </style>
-            </head>
-            <body>
-              <div class="report-content">
-                ${printContents}
-              </div>
-            </body>
-          </html>
-        `);
+      <html>
+        <head>
+          <title>Print Report</title>
+          <style>
+            body { 
+              margin: 0;
+              padding: 0;
+              background: #eaf2fb !important;
+              color: #222 !important;
+              font-family: Arial, sans-serif !important;
+            }
+            [data-report] {
+              background: #eaf2fb !important;
+              color: #222222 !important;
+              width: 800px !important;
+              font-family: Arial, sans-serif !important;
+              margin: 0 auto !important;
+              padding: 24px !important;
+              box-shadow: 0 0 10px rgba(0,0,0,0.1) !important;
+              border-radius: 8px !important;
+              border: none !important;
+              position: relative !important;
+            }
+            .grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 24px !important;
+  background: white !important;
+  border-radius: 10px !important;
+  padding: 16px !important;
+  margin-bottom: 24px !important;
+}
+            .interpretation-section {
+              background: #fffde7 !important;
+              border-left: 4px solid #ffe066 !important;
+              border-radius: 6px !important;
+              padding: 16px !important;
+              margin-bottom: 24px !important;
+            }
+            .interpretation-section h4 {
+              font-weight: bold !important;
+              color: #222 !important;
+              margin-bottom: 8px !important;
+              font-size: 20px !important;
+            }
+            .interpretation-section ul {
+              margin: 0 !important;
+              padding-left: 20px !important;
+              font-size: 15px !important;
+              color: #444 !important;
+            }
+            .grid > div {
+              background: transparent !important;
+              border: none !important;
+              border-radius: 8px !important;
+              padding: 16px !important;
+              box-shadow: none !important;
+              margin-bottom: 0px !important;
+            }
+            h2 {
+              text-align: center !important;
+              display: block !important;
+              margin: 0 auto !important;
+              font-weight: bold !important;
+              font-size: 22px !important;
+              color: #222 !important;
+            }
+            /* Add more rules as needed for tables, headings, etc. */
+            @media print {
+              body { margin: 0; }
+              [data-report] { box-shadow: none !important; }
+            }
+              .flex { display: flex !important; }
+.justify-between { justify-content: space-between !important; }
+.items-start { align-items: flex-start !important; }
+.grid { display: grid !important; }
+.grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+.gap-6 { gap: 1.5rem !important; }
+@media (max-width: 768px) {
+  .grid-cols-2 { grid-template-columns: 1fr !important; }
+}
+          </style>
+        </head>
+        <body>
+          <div data-report>
+            ${printContents}
+          </div>
+        </body>
+      </html>
+    `);
+
         printWindow.document.close();
         printWindow.focus();
+
         setTimeout(() => {
             printWindow.print();
             printWindow.close();
         }, 500);
     };
+
+
 
     const groupTestsByCategory = (tests) => {
         const grouped = {};
@@ -411,7 +580,7 @@ const Reports = () => {
                         }}
                     >
                         {/* Header with logo */}
-                        <div className="flex justify-between items-start mb-2">
+                        <div className="flex justify-between items-start mb-2 ">
                             <div>
                                 <h1 className="text-2xl font-bold text-blue-900 uppercase">{labInfo.name}</h1>
                                 <p className="text-gray-700 text-sm font-medium">{labInfo.slogan}</p>
@@ -421,7 +590,7 @@ const Reports = () => {
                                     <div className="flex items-center gap-2"><span className="material-icons text-base">email</span>{labInfo.email}</div>
                                 </div>
                             </div>
-                            <img src={companyLogo} alt="Logo" style={{ height: 80, marginLeft: 32, borderRadius: 8 }} />
+                            <img src={companyLogo} alt="Logo" style={{ height: 140, marginLeft: 32, borderRadius: 8, marginTop: -15 }} />
                         </div>
                         <hr className="my-4 border-blue-200" />
                         <div className="text-center mb-4">
@@ -489,7 +658,7 @@ const Reports = () => {
                                 ))}
                             </div>
                         ))}
-                        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+                        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 interpretation-section">
                             <h4 className="font-bold text-gray-800 mb-2">CLINICAL INTERPRETATION</h4>
                             <ul className="list-disc pl-5 text-sm text-gray-700">
                                 <li>Values marked with ↑ (High) or ↓ (Low) are outside the reference range</li>
@@ -519,7 +688,7 @@ const Reports = () => {
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginRight: 32 }}>
                                 <img src={azazKhanSignature} alt="Signature" style={{ height: 40, margin: '0 0 4px 0' }} />
                                 <div style={{ fontWeight: 700, fontSize: 14, marginTop: 4 }}>DR. AJAZ KHAN<br /><span style={{ fontWeight: 400 }}>MD, (MBBS)</span></div>
-                                <div style={{ fontSize: 12, color: '#888',marginRight:-18 }}>CONSULTANT PATHOLOGIST</div>
+                                <div style={{ fontSize: 12, color: '#888', marginRight: -18 }}>CONSULTANT PATHOLOGIST</div>
                             </div>
                         </div>
 
@@ -537,10 +706,10 @@ const Reports = () => {
                                 gap: 8,
                             }}
                         >
-                            <div style={{ textAlign: 'left', fontWeight: 700,fontSize: 14 }}>
+                            <div style={{ textAlign: 'left', fontWeight: 700, fontSize: 14 }}>
                                 Lab Director: Md Sajid Husain
                             </div>
-                            <div style={{ textAlign: 'right', fontSize: 12,fontWeight: 400 }}>
+                            <div style={{ textAlign: 'right', fontSize: 12, fontWeight: 400 }}>
                                 This is a computer generated report<br />
                                 Report generated on: {reportDate}, {reportTime}
                             </div>

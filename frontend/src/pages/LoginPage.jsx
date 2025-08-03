@@ -6,6 +6,7 @@ import { useAuth } from '../AuthContext';
 const SignIn = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -59,17 +60,29 @@ const SignIn = () => {
             disabled={loading}
           />
           <label className="block text-gray-700 mb-1">Password</label>
-          <input 
-            type="password" 
-            className={`w-full mb-4 px-3 py-2 rounded bg-blue-50 border ${
-              error ? 'border-red-500' : 'border-blue-100'
-            } focus:outline-none`}
-            value={password} 
-            onChange={e => setPassword(e.target.value)} 
-            required 
-            minLength={6}
-            disabled={loading}
-          />
+          <div className="relative mb-4">
+            <input 
+              type={showPassword ? "text" : "password"}
+              className={`w-full px-3 py-2 rounded bg-blue-50 border ${
+                error ? 'border-red-500' : 'border-blue-100'
+              } focus:outline-none pr-10`}
+              value={password} 
+              onChange={e => setPassword(e.target.value)} 
+              required 
+              minLength={6}
+              disabled={loading}
+            />
+            <span
+              className="material-icons absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-gray-500"
+              style={{ userSelect: 'none' }}
+              onClick={() => setShowPassword(v => !v)}
+              tabIndex={0}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              role="button"
+            >
+              {showPassword ? "visibility_off" : "visibility"}
+            </span>
+          </div>
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded mb-4 text-sm">
               {error}
@@ -95,4 +108,4 @@ const SignIn = () => {
   );
 };
 
-export default SignIn; 
+export default SignIn;

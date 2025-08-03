@@ -14,6 +14,7 @@ import Security from './pages/Security';
 import './App.css'
 import logo from './assets/logo.svg';
 import { AuthProvider, useAuth } from './AuthContext';
+import ViewReport from './components/ViewReport';
 
 function RequireAuth({ children }) {
   const location = useLocation();
@@ -45,6 +46,7 @@ function AppLayout() {
           <Route path="/administration" element={<RequireAuth><Administration /></RequireAuth>} />
           <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
           <Route path="/security" element={<RequireAuth><Security /></RequireAuth>} />
+          <Route path="/view-report/:patientCode" element={<ViewReport />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </main>
