@@ -1,9 +1,18 @@
-# MedLab Pro - Laboratory Management System
+# MetaCore - Laboratory Management System
 
 <div align="center">
-  <img src="metacore/frontend/src/assets/logo1.png" alt="MedLab Pro Logo" width="200"/>
+  <img src="frontend/src/assets/logo.svg" alt="MetaCore Logo" width="200"/>
   
-  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.## 👥 Team
+
+- **Aditya Bhujade** - Project Lead & Developer
+- **Development Team** - Contributors
+
+## 📞 Support
+
+For support and queries:
+- Email: contact@metacore.com
+- GitHub Issues: [Create an issue](https://github.com/AdityaBhujade/MetaCore_complete/issues)es/MIT)
   [![React](https://img.shields.io/badge/React-18.x-blue.svg)](https://reactjs.org/)
   [![Flask](https://img.shields.io/badge/Flask-3.0.2-green.svg)](https://flask.palletsprojects.com/)
   [![MySQL](https://img.shields.io/badge/MySQL-8.0-orange.svg)](https://www.mysql.com/)
@@ -11,7 +20,7 @@
 
 ## 🏥 Overview
 
-MedLab Pro is a comprehensive Laboratory Management System designed to streamline laboratory operations, patient management, and test result tracking. Built with modern web technologies, it provides an intuitive interface for healthcare professionals to manage patient data, conduct tests, and generate reports efficiently.
+MetaCore is a comprehensive Laboratory Management System designed to streamline laboratory operations, patient management, and test result tracking. Built with modern web technologies, it provides an intuitive interface for healthcare professionals to manage patient data, conduct tests, and generate reports efficiently.
 
 ## ✨ Features
 
@@ -106,8 +115,8 @@ metacore/
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/AdityaBhujade/MedLab-Pro.git
-   cd MedLab-Pro
+   git clone https://github.com/AdityaBhujade/MetaCore_complete.git
+   cd MetaCore_complete
    ```
 
 2. **Database Setup**
@@ -120,12 +129,12 @@ metacore/
    USE metacore_db;
    
    # Import database schema
-   SOURCE metacore/database/metacore_db.sql;
+   SOURCE database/metacore_db.sql;
    ```
 
 3. **Backend Setup**
    ```bash
-   cd metacore/backend
+   cd backend
    
    # Install Python dependencies
    pip install -r requirements.txt
@@ -140,7 +149,7 @@ metacore/
 
 4. **Frontend Setup**
    ```bash
-   cd metacore/frontend
+   cd frontend
    
    # Install dependencies
    npm install
@@ -157,7 +166,7 @@ metacore/
 
 ### Environment Variables
 
-Create a `.env` file in the `metacore/backend` directory:
+Create a `.env` file in the `backend` directory:
 
 ```env
 # Database Configuration
@@ -218,11 +227,11 @@ The system uses the following main tables:
 
 ```bash
 # Frontend tests
-cd metacore/frontend
+cd frontend
 npm run test
 
 # Backend tests
-cd metacore/backend
+cd backend
 python -m pytest
 ```
 
@@ -259,5 +268,5 @@ For support and queries:
 ---
 
 <div align="center">
-  Made with ❤️ by the MedLab Pro Team
+  Made with ❤️ by the MetaCore Team
 </div>
